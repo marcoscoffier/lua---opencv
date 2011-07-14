@@ -978,7 +978,8 @@ static int libopencv_(Main_cvReleaseCAM) (lua_State *L) {
 //============================================================
 // Register functions in LUA
 //
-static const struct luaL_reg opencv [] = {
+static const luaL_reg libopencv_(Main__) [] = 
+{
   {"canny",                libopencv_(Main_cvCanny)},
   {"sobel",                libopencv_(Main_cvSobel)},
   {"captureFromCam",       libopencv_(Main_cvCaptureFromCAM)},
