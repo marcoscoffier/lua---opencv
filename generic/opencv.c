@@ -270,12 +270,12 @@ static CvPoint2D32f * torch_32F2opencvPoints(THTensor *src) {
 //
 static int libopencv_(Main_cvCanny) (lua_State *L) {
   // Get Tensor's Info
-  THCharTensor * source = luaT_checkudata(L, 1, luaT_checktypename2id(L, "torch.CharTensor"));
-  THCharTensor * dest = luaT_checkudata(L, 2, luaT_checktypename2id(L, "torch.CharTensor"));
+  THCharTensor * source = luaT_checkudata(L, 1, torch_(Tensor_id));  
+  THCharTensor * dest   = luaT_checkudata(L, 2, torch_(Tensor_id));  
 
   // Generate IPL headers
   IplImage * source_ipl = charImage(source);
-  IplImage * dest_ipl = charImage(dest);
+  IplImage * dest_ipl   = charImage(dest);
 
   // Thresholds with default values
   double low_threshold = 0;
@@ -298,12 +298,12 @@ static int libopencv_(Main_cvCanny) (lua_State *L) {
 
 static int libopencv_(Main_cvSobel) (lua_State *L) {
   // Get Tensor's Info
-  THCharTensor * source = luaT_checkudata(L, 1, luaT_checktypename2id(L, "torch.CharTensor"));
-  THShortTensor * dest = luaT_checkudata(L, 2, luaT_checktypename2id(L, "torch.ShortTensor"));
+  THCharTensor * source = luaT_checkudata(L, 1, torch_(Tensor_id));  
+  THShortTensor * dest  = luaT_checkudata(L, 2, torch_(Tensor_id));  
 
   // Generate IPL headers
   IplImage * source_ipl = charImage(source);
-  IplImage * dest_ipl = shortImage(dest);
+  IplImage * dest_ipl   = shortImage(dest);
 
   // Thresholds with default values
   int dx = 0;
@@ -326,8 +326,8 @@ static int libopencv_(Main_cvSobel) (lua_State *L) {
 //============================================================
 static int libopencv_(Main_cvCornerHarris) (lua_State *L) {
   // Get Tensor's Info
-  THTensor * image = luaT_checkudata(L, 1, luaT_checktypename2id(L, "torch.Tensor"));
-  THTensor * harris = luaT_checkudata(L, 2, luaT_checktypename2id(L, "torch.Tensor"));
+  THTensor * image  = luaT_checkudata(L, 1, torch_(Tensor_id));  
+  THTensor * harris = luaT_checkudata(L, 2, torch_(Tensor_id));  
 
   IplImage * image_ipl = torch2opencv_8U(image);
 
@@ -367,12 +367,12 @@ static int libopencv_(Main_cvCornerHarris) (lua_State *L) {
 //============================================================
 static int libopencv_(Main_cvGoodFeaturesToTrack) (lua_State *L) {
   // Get Tensor's Info
-  THTensor * image = luaT_checkudata(L, 1, luaT_checktypename2id(L, "torch.Tensor"));
-  THTensor * points = luaT_checkudata(L, 2, luaT_checktypename2id(L, "torch.Tensor"));
-  THTensor * image_out = luaT_checkudata(L, 3, luaT_checktypename2id(L, "torch.Tensor"));
+  THTensor * image     = luaT_checkudata(L, 1, torch_(Tensor_id));  
+  THTensor * points    = luaT_checkudata(L, 2, torch_(Tensor_id));  
+  THTensor * image_out = luaT_checkudata(L, 3, torch_(Tensor_id));  
   
-  CvSize dest_size = cvSize(image->size[0], image->size[1]);
-  IplImage * image_ipl = torch2opencv_8U(image);
+  CvSize dest_size         = cvSize(image->size[0], image->size[1]);
+  IplImage * image_ipl     = torch2opencv_8U(image);
   IplImage * image_out_ipl = torch2opencv_8U(image_out);
 
 
@@ -438,10 +438,10 @@ static int libopencv_(Main_cvGoodFeaturesToTrack) (lua_State *L) {
 //============================================================
 static int libopencv_(Main_cvTrackPyrLK) (lua_State *L) {
   // Get Tensor's Info
-  THTensor * image1 = luaT_checkudata(L, 1, luaT_checktypename2id(L, "torch.Tensor"));
-  THTensor * image2 = luaT_checkudata(L, 2, luaT_checktypename2id(L, "torch.Tensor"));
-  THTensor * points1 = luaT_checkudata(L, 3, luaT_checktypename2id(L, "torch.Tensor"));
-  THTensor * points2 = luaT_checkudata(L, 4, luaT_checktypename2id(L, "torch.Tensor"));
+  THTensor * image1  = luaT_checkudata(L, 1, torch_(Tensor_id));  
+  THTensor * image2  = luaT_checkudata(L, 2, torch_(Tensor_id));  
+  THTensor * points1 = luaT_checkudata(L, 3, torch_(Tensor_id));  
+  THTensor * points2 = luaT_checkudata(L, 4, torch_(Tensor_id));  
   THTensor * ff = 0;
   THTensor * fe = 0;
 
@@ -454,11 +454,11 @@ static int libopencv_(Main_cvTrackPyrLK) (lua_State *L) {
   }
 
   if (!lua_isnil(L,6)) {
-    ff = luaT_checkudata(L,6,luaT_checktypename2id(L, "torch.Tensor"));
+    ff = luaT_checkudata(L,6,torch_(Tensor_id));  
     THTensor_resize1d(ff,count);
   }
   if (!lua_isnil(L,7)) {
-    fe = luaT_checkudata(L,7,luaT_checktypename2id(L, "torch.Tensor"));
+    fe = luaT_checkudata(L,7,torch_(Tensor_id));  
     THTensor_resize1d(fe,count);
   }
 
@@ -522,12 +522,12 @@ static int libopencv_(Main_cvTrackPyrLK) (lua_State *L) {
 //============================================================
 static int libopencv_(Main_cvCalcOpticalFlowPyrLK) (lua_State *L) {
   // Get Tensor's Info
-  THTensor * image1 = luaT_checkudata(L, 1, luaT_checktypename2id(L, "torch.Tensor"));
-  THTensor * image2 = luaT_checkudata(L, 2, luaT_checktypename2id(L, "torch.Tensor"));
-  THTensor * flow_x = luaT_checkudata(L, 3, luaT_checktypename2id(L, "torch.Tensor"));
-  THTensor * flow_y = luaT_checkudata(L, 4, luaT_checktypename2id(L, "torch.Tensor"));
-  THTensor * points = luaT_checkudata(L, 5, luaT_checktypename2id(L, "torch.Tensor"));
-  THTensor * image_out = luaT_checkudata(L, 6, luaT_checktypename2id(L, "torch.Tensor"));
+  THTensor * image1 = luaT_checkudata(L, 1, torch_(Tensor_id));  
+  THTensor * image2 = luaT_checkudata(L, 2, torch_(Tensor_id));  
+  THTensor * flow_x = luaT_checkudata(L, 3, torch_(Tensor_id));  
+  THTensor * flow_y = luaT_checkudata(L, 4, torch_(Tensor_id));  
+  THTensor * points = luaT_checkudata(L, 5, torch_(Tensor_id));  
+  THTensor * image_out = luaT_checkudata(L, 6, torch_(Tensor_id));  
   
 
   int count = 500;
@@ -636,15 +636,15 @@ static int libopencv_(Main_cvCalcOpticalFlowPyrLK) (lua_State *L) {
 //============================================================
 // draws red flow lines on an image (for visualizing the flow)
 static int libopencv_(Main_cvDrawFlowlinesOnImage) (lua_State *L) {
-  THTensor * points1 = luaT_checkudata(L,1, luaT_checktypename2id(L, "torch.Tensor"));
-  THTensor * points2 = luaT_checkudata(L,2, luaT_checktypename2id(L, "torch.Tensor"));
-  THTensor * image   = luaT_checkudata(L,3, luaT_checktypename2id(L, "torch.Tensor"));
-  THTensor * color   = luaT_checkudata(L,4, luaT_checktypename2id(L, "torch.Tensor"));
+  THTensor * points1 = luaT_checkudata(L,1, torch_(Tensor_id));  
+  THTensor * points2 = luaT_checkudata(L,2, torch_(Tensor_id));  
+  THTensor * image   = luaT_checkudata(L,3, torch_(Tensor_id));  
+  THTensor * color   = luaT_checkudata(L,4, torch_(Tensor_id));  
   THTensor * mask    = 0;
   int usemask = 0;
   if (!lua_isnil(L,5)){
     usemask = 1;
-    mask = luaT_checkudata(L,5, luaT_checktypename2id(L, "torch.Tensor"));
+    mask = luaT_checkudata(L,5, torch_(Tensor_id));
   }
   IplImage * image_ipl = torch2opencv_8U(image);
   CvScalar color_cv = CV_RGB(THTensor_get1d(color,0),
@@ -675,14 +675,14 @@ static int libopencv_(Main_cvDrawFlowlinesOnImage) (lua_State *L) {
 //
 static int libopencv_(Main_cvCalcOpticalFlow)(lua_State *L) {
   // Get Tensor's Info
-  THTensor * current = luaT_checkudata(L, 1, luaT_checktypename2id(L, "torch.Tensor"));
-  THTensor * previous = luaT_checkudata(L, 2, luaT_checktypename2id(L, "torch.Tensor"));
-  THTensor * velx = luaT_checkudata(L, 3, luaT_checktypename2id(L, "torch.Tensor"));
-  THTensor * vely = luaT_checkudata(L, 4, luaT_checktypename2id(L, "torch.Tensor"));
+  THTensor * curr = luaT_checkudata(L, 1, torch_(Tensor_id));  
+  THTensor * prev = luaT_checkudata(L, 2, torch_(Tensor_id));  
+  THTensor * velx = luaT_checkudata(L, 3, torch_(Tensor_id));  
+  THTensor * vely = luaT_checkudata(L, 4, torch_(Tensor_id));  
 
   // Generate IPL images
-  IplImage * current_ipl = torch2opencv_8U(current);
-  IplImage * previous_ipl = torch2opencv_8U(previous);
+  IplImage * curr_ipl = torch2opencv_8U(curr);
+  IplImage * prev_ipl = torch2opencv_8U(previous);
   IplImage * velx_ipl;
   IplImage * vely_ipl;
 
@@ -729,8 +729,8 @@ static int libopencv_(Main_cvCalcOpticalFlow)(lua_State *L) {
   if (method == 1) 
     {
       // Alloc outputs
-      CvSize osize = cvSize((previous_ipl->width-blockSize.width)/shiftSize.width,
-                            (previous_ipl->height-blockSize.height)/shiftSize.height);
+      CvSize osize = cvSize((prev_ipl->width-blockSize.width)/shiftSize.width,
+                            (prev_ipl->height-blockSize.height)/shiftSize.height);
 
       // Use previous results
       if (usePrevious == 1) {
@@ -742,24 +742,24 @@ static int libopencv_(Main_cvCalcOpticalFlow)(lua_State *L) {
       }
 
       // Cv Call
-      cvCalcOpticalFlowBM(previous_ipl, current_ipl, blockSize, shiftSize, 
+      cvCalcOpticalFlowBM(prev_ipl, curr_ipl, blockSize, shiftSize, 
                           max_range, usePrevious, velx_ipl, vely_ipl);
     }
   else if (method == 2) 
     {
       // Alloc outputs
-      CvSize osize = cvSize(previous_ipl->width, previous_ipl->height);
+      CvSize osize = cvSize(prev_ipl->width, prev_ipl->height);
 
       velx_ipl = cvCreateImage(osize, IPL_DEPTH_32F, 1);
       vely_ipl = cvCreateImage(osize, IPL_DEPTH_32F, 1);
 
       // Cv Call
-      cvCalcOpticalFlowLK(previous_ipl, current_ipl, blockSize, velx_ipl, vely_ipl);
+      cvCalcOpticalFlowLK(prev_ipl, curr_ipl, blockSize, velx_ipl, vely_ipl);
     }
   else if (method == 3) 
     {
       // Alloc outputs
-      CvSize osize = cvSize(previous_ipl->width, previous_ipl->height);
+      CvSize osize = cvSize(prev_ipl->width, prev_ipl->height);
 
       // Use previous results
       if (usePrevious == 1) {
@@ -774,7 +774,7 @@ static int libopencv_(Main_cvCalcOpticalFlow)(lua_State *L) {
       CvTermCriteria term = cvTermCriteria(CV_TERMCRIT_ITER, iterations, 0);
 
       // Cv Call
-      cvCalcOpticalFlowHS(previous_ipl, current_ipl, usePrevious, velx_ipl, vely_ipl, 
+      cvCalcOpticalFlowHS(prev_ipl, curr_ipl, usePrevious, velx_ipl, vely_ipl, 
                           lagrangian, term);
     }
 
@@ -783,8 +783,8 @@ static int libopencv_(Main_cvCalcOpticalFlow)(lua_State *L) {
   opencv2torch_32F(vely_ipl, vely);
 
   // Deallocate IPL images
-  cvReleaseImage(&previous_ipl);
-  cvReleaseImage(&current_ipl);
+  cvReleaseImage(&prev_ipl);
+  cvReleaseImage(&curr_ipl);
   cvReleaseImage(&vely_ipl);
   cvReleaseImage(&velx_ipl);
 
@@ -851,7 +851,7 @@ void openCVBGRtoTorchRGB(IplImage * source, IplImage * dest) {
 //
 static int libopencv_(Main_cvHaarDetectObjects) (lua_State *L) {
   // Generate IPL header from tensor
-  THCharTensor * input = luaT_checkudata(L, 1, luaT_checktypename2id(L, "torch.CharTensor"));
+  THCharTensor * input = luaT_checkudata(L, 1, torch_(Tensor_id));
   IplImage * image = charImage(input);
 
   // Invert channels 
@@ -959,13 +959,13 @@ static int libopencv_(Main_cvCaptureFromCAM) (lua_State *L) {
   }
 
   // Generate IPL headers
-  IplImage * current_image = doubleImage(image_byte);
+  IplImage * curr_image = doubleImage(image_byte);
 
   // copy this frame to torch format
-  openCVBGRtoTorchRGB(frame, current_image);
+  openCVBGRtoTorchRGB(frame, curr_image);
 
   // Deallocate headers
-  cvReleaseImageHeader(&current_image);
+  cvReleaseImageHeader(&curr_image);
   
   return 0;
 }
