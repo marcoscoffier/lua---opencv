@@ -934,7 +934,7 @@ static int libopencv_(Main_cvHaarDetectObjects) (lua_State *L) {
 static CvCapture *camera = 0;
 static int libopencv_(Main_cvCaptureFromCAM) (lua_State *L) {
   // Get Tensor's Info
-  THTensor * image_byte = luaT_checkudata(L, 1, luaT_checktypename2id(L, "torch.Tensor"));
+  THTensor * image = luaT_checkudata(L, 1, torch_(Tensor_id));  
 
   // idx
   int camidx = 0;
@@ -953,13 +953,13 @@ static int libopencv_(Main_cvCaptureFromCAM) (lua_State *L) {
   if (!frame) perror("Could not get frame...\n");
 
   // resize given tensor
-  if (image_byte->size[1]!=frame->width 
-      || image_byte->size[2]!=frame->height || image_byte->size[3]!=3) {
-     THTensor_resize3d(image_byte,frame->width,frame->height,3);
+  if (image->size[1]!=frame->width 
+      || image->size[2]!=frame->height || image->size[3]!=3) {
+     THTensor_resize3d(image,frame->width,frame->height,3);
   }
 
   // Generate IPL headers
-  IplImage * curr_image = doubleImage(image_byte);
+  IplImage * curr_image = doubleImage(image);
 
   // copy this frame to torch format
   openCVBGRtoTorchRGB(frame, curr_image);
