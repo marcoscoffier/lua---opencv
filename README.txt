@@ -1,0 +1,13 @@
+-- 
+-- Note: this bit of code is a simple wrapper around the OpenCV library
+--       http://opencv.willowgarage.com/
+--
+-- For now, it contains wrappers for:
+--  + cvCalcOpticalFlowBM
+--  + cvCalcOpticalFlowHS
+--  + cvCalcOpticalFlowLK
+--  + cvHaarDetectObjects
+--  + cvCaptureFromCAM
+--  + cvSobel
+--  + cvCanny
+
