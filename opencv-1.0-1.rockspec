@@ -54,6 +54,7 @@ build = {
 	    MESSAGE(STATUS "OpenCV include dirs: ${OpenCV_INCLUDE_DIRS}")
    	    INCLUDE_DIRECTORIES (${OpenCV_INCLUDE_DIRS} ${TORCH_INCLUDE_DIR} ${PROJECT_SOURCE_DIR})
    	    add_library(opencv SHARED "${src}" "${luasrc}")
+	    link_directories (${TORCH_LIBRARY_DIR})
    	    TARGET_LINK_LIBRARIES(opencv ${TORCH_LIBRARIES} ${OpenCV_LIBS})
 	    install_files(/lua/opencv init.lua)
 	    install_targets (/lib opencv)
