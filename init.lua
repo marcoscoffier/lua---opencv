@@ -20,6 +20,7 @@
 
 require 'torch'
 require 'xlua'
+require 'image'
 
 opencv = {}
 
@@ -48,6 +49,10 @@ function opencv.CornerHarris(...)
    end
    
    local img = img
+   if img:size(1) > 1 then
+      print('WARNING: computing harris corners on first feature')
+      img=img:narrow(1,1,1)
+   end
    if aperturesize % 2 == 0 then
       print('WARNING: aperturesize (Sobel kernel size) must be odd and not larger than 31')
       aperturesize = aperturesize -1 
@@ -57,21 +62,13 @@ function opencv.CornerHarris(...)
    return harris
 end
 
--- -- testers:
--- opencv.test_CornerHarris
-   --    = function()
-   -- 	   local a = image.load(paths.concat(paths.install_lua_path, 'opticalFlow/img1.jpg'))
-	   
-   -- 	   local harris = opencv.CornerHarris{img=a,
-   -- 					      blocksize=5,
-   -- 					      aperturesize=3,
-   -- 					      k=0.05}
-
-   -- 	   image.displayList{images={a,harris},
-   -- 			     legends={'original image','Harris Corners'},
-   -- 			     legend='harris corner detection',
-   -- 			     win_w=a:size(1)*2,win_h=a:size(2)}
-   -- 	end                     
+-- test function:
+function opencv.CornerHarris_testme()
+   local lena = image.lena()
+   local harris = opencv.CornerHarris(lena,5,3,0.05)
+   image.display{image=lena,legend='original image'}
+   image.display{image=harris,legend='Harris Corners'}
+end                     
 
 -- local help = {
 --    calcOpticalFlow = [[
