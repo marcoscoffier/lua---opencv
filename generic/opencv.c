@@ -48,7 +48,7 @@ static THTensor * libopencv_(Main_opencv2torch)(IplImage *source, THTensor *dest
   source_step /= sizeof(float);
 
   // Resize target
-  THTensor_(resize3d)(dest, source->width, source->height, source->nChannels);  
+  THTensor_(resize3d)(dest, source->nChannels, source->width, source->height);  
   THTensor *tensor = THTensor_(newContiguous)(dest,0);
 
   // copy
@@ -63,19 +63,17 @@ static IplImage * libopencv_(Main_torch2opencv_8U)(THTensor *source) {
   uchar * dest_data;
 
   // Get size and channels
-  int channels = source->size[2];
+  int channels = source->size[0];
   int dest_step;
-  CvSize dest_size = cvSize(source->size[0], source->size[1]);
+  CvSize dest_size = cvSize(source->size[1], source->size[2]);
 
   // Create ipl image
   IplImage * dest = cvCreateImage(dest_size, IPL_DEPTH_8U, channels);
 
   // get pointer to raw data
   cvGetRawData(dest, (uchar**)&dest_data, &dest_step, &dest_size);
-
   // copy
   THTensor *tensor = THTensor_(newContiguous)(source,0);
-  //real *tensor_data = THTensor_(data)(tensorc);
   TH_TENSOR_APPLY(real, tensor, 
 		  *dest_data++ = (uchar)(*tensor_data * 255.0););
   // return freshly created IPL image
@@ -88,36 +86,38 @@ static int libopencv_(Main_cvCornerHarris) (lua_State *L) {
   THTensor * image  = luaT_checkudata(L, 1, torch_(Tensor_id));  
   THTensor * harris = luaT_checkudata(L, 2, torch_(Tensor_id));  
 
-  IplImage * image_ipl = libopencv_(Main_torch2opencv_8U)(image);
+  if (image->size[0] > 1){
+    printf("WARNING: CorverHarris only accepts single channel images\n");
+  } else {
+    CvSize dest_size = cvSize(image->size[1], image->size[2]);
+    IplImage * image_ipl = libopencv_(Main_torch2opencv_8U)(image);
+    // Create ipl image
+    IplImage * harris_ipl = cvCreateImage(dest_size, IPL_DEPTH_32F, 1);
 
-  CvSize dest_size = cvSize(image->size[0], image->size[1]);
+    int blockSize = 5;
+    int aperture_size = 3;
+    double k = 0.04;
+    
+    // User values:
+    if (lua_isnumber(L, 3)) {
+      blockSize = lua_tonumber(L, 3);
+    }
+    if (lua_isnumber(L, 4)) {
+      aperture_size = lua_tonumber(L, 4);
+    }
+    if (lua_isnumber(L, 5)) {
+      k = lua_tonumber(L, 5);
+    }
 
-  // Create ipl image
-  IplImage * harris_ipl = cvCreateImage(dest_size, IPL_DEPTH_32F, 1);
+    cvCornerHarris(image_ipl, harris_ipl, blockSize, aperture_size, k);
 
-  int blockSize = 5;
-  int aperture_size = 3;
-  double k = 0.04;
+    // return results
+    libopencv_(Main_opencv2torch)(harris_ipl, harris);
 
-  // User values:
-  if (lua_isnumber(L, 3)) {
-    blockSize = lua_tonumber(L, 3);
+    // Deallocate IPL images
+    cvReleaseImage(&harris_ipl);
+    cvReleaseImage(&image_ipl);
   }
-  if (lua_isnumber(L, 4)) {
-    aperture_size = lua_tonumber(L, 4);
-  }
-  if (lua_isnumber(L, 5)) {
-    k = lua_tonumber(L, 5);
-  }
-
-  cvCornerHarris(image_ipl, harris_ipl, blockSize, aperture_size, k);
-
-  // return results
-  opencv2torch(harris_ipl, harris);
-
-  // Deallocate IPL images
-  cvReleaseImage(&harris_ipl);
-  cvReleaseImage(&image_ipl);
 
   return 0;
 }

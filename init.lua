@@ -3,6 +3,8 @@
 --       http://opencv.willowgarage.com/
 --
 -- For now, it contains wrappers for:
+--  + cvCornerHarris
+--
 --  + cvCalcOpticalFlowBM
 --  + cvCalcOpticalFlowHS
 --  + cvCalcOpticalFlowLK
@@ -12,81 +14,89 @@
 --  + cvCanny
 --
 -- Wrapper: Clement Farabet.
+-- Additional functions GoodFeatures(): Marco Scoffier
+-- Adapted for torch7: Marco Scoffier
 -- 
+
+require 'torch'
+require 'xlua'
+
+opencv = {}
 
 -- load C lib
 require 'libopencv'
 
-local help = {
-   calcOpticalFlow = [[
-Computes the optical flow of a pair of images, and returns
-4 maps: the flow field intensities, the flow field directions, and
-the raw X and Y components
 
-The flow field is computed using one of 3 methods: Block Matching (BM),
-Lucas-Kanade (LK) or Horn-Schunck (HS).
+-- CornerHarris
+function opencv.CornerHarris(...)
+   local args = {...}
+   local img, blocksize, aperturesize, k 
+   img = args[1]
+   blocksize = args[2] or 9
+   aperturesize = args[3] or 3
+   k = args[4] or 0.04
+   
+   if not img and not img:find('Tensor') then
+      print(xlua.usage('opencv.CornerHarris',
+		       'Computes the Harris Corner features of an image the input image must be a of WxHx1 tensor',
+		       nil,
+		       {type='torch.Tensor', help='image in which to detect Haar points'},
+		       {type='number', help='neighborhood size', default=9},
+		       {type='number',help='Sobel aperture size', default=3},
+		       {type='number',help='the Harris detector free parameter',default=0.04}))
+      xlua.error('incorrect arguments', 'imgraph.connectcomponents')
+   end
+   
+   local img = img
+   if aperturesize % 2 == 0 then
+      print('WARNING: aperturesize (Sobel kernel size) must be odd and not larger than 31')
+      aperturesize = aperturesize -1 
+   end
+   local harris = torch.Tensor():resizeAs(img)
+   img.libopencv.CornerHarris(img,harris,blocksize,aperturesize,k)
+   return harris
+end
 
-The input images must be a pair of WxHx1 tensors.]],
-
-   CornerHarris = [[
-Computes the Harris Corner features of an image
-The input image must be a of WxHx1 tensor]],
-
-   TrackPyrLK = [[
-Runs pyramidal Lucas-Kanade, on two input images and a set of points
-which are meant to be tracked ]],
-
-   calcOpticalFlowPyrLK = [[
-Computes the optical flow of a pair of images using the Pyramidal 
-Lucas-Kanade algorithm on a set of interest points.
-Returns a points tensor of the sub-pixel positions of the features 
-and a copy of the input image with yellow circles around the 
-interest points ]]
-}
-
-if not opencvLoaded then
-   require 'XLearn'
-   opencv = {}
-   -- CornerHarris
-   opencv.CornerHarris
-      = function(...)
-	   local args, img, blocksize, aperturesize, k = toolBox.unpack(
-	      {...},
-	      'opencv.CornerHarris',
-	      help.CornerHarris,
-	      {arg='img', type='torch.Tensor', help='image in which to detect Haar points'},
-	      {arg='blocksize',type='number', help='neighborhood size', default=9},
-	      {arg='aperturesize',type='number',help='Sobel aperture size', default=3},
-	      {arg='k',type='number',help='the Harris detector free parameter',default=0.04}
-	   )
-	   local img = img
-	   if img:size(3) > 1 then
-	      img = img:narrow(3,2,1)
-	   end
-	   if aperturesize % 2 == 0 then
-	      print('WARNING: aperturesize (Sobel kernel size) must be odd and not larger than 31')
-	      aperturesize = aperturesize -1 
-	   end
-	   local harris = torch.Tensor():resizeAs(img)
-	   libopencv.CornerHarris(img,harris,blocksize,aperturesize,k)
-	   return harris
-	end
-
-   -- testers:
-   opencv.test_CornerHarris
-      = function()
-	   local a = image.load(paths.concat(paths.install_lua_path, 'opticalFlow/img1.jpg'))
+-- -- testers:
+-- opencv.test_CornerHarris
+   --    = function()
+   -- 	   local a = image.load(paths.concat(paths.install_lua_path, 'opticalFlow/img1.jpg'))
 	   
-	   local harris = opencv.CornerHarris{img=a,
-					      blocksize=5,
-					      aperturesize=3,
-					      k=0.05}
+   -- 	   local harris = opencv.CornerHarris{img=a,
+   -- 					      blocksize=5,
+   -- 					      aperturesize=3,
+   -- 					      k=0.05}
 
-	   image.displayList{images={a,harris},
-			     legends={'original image','Harris Corners'},
-			     legend='harris corner detection',
-			     win_w=a:size(1)*2,win_h=a:size(2)}
-	end                     
+   -- 	   image.displayList{images={a,harris},
+   -- 			     legends={'original image','Harris Corners'},
+   -- 			     legend='harris corner detection',
+   -- 			     win_w=a:size(1)*2,win_h=a:size(2)}
+   -- 	end                     
+
+-- local help = {
+--    calcOpticalFlow = [[
+-- Computes the optical flow of a pair of images, and returns
+-- 4 maps: the flow field intensities, the flow field directions, and
+-- the raw X and Y components
+
+-- The flow field is computed using one of 3 methods: Block Matching (BM),
+-- Lucas-Kanade (LK) or Horn-Schunck (HS).
+
+-- The input images must be a pair of WxHx1 tensors.]],
+
+--    CornerHarris = [[
+
+--    TrackPyrLK = [[
+-- Runs pyramidal Lucas-Kanade, on two input images and a set of points
+-- which are meant to be tracked ]],
+
+--    calcOpticalFlowPyrLK = [[
+-- Computes the optical flow of a pair of images using the Pyramidal 
+-- Lucas-Kanade algorithm on a set of interest points.
+-- Returns a points tensor of the sub-pixel positions of the features 
+-- and a copy of the input image with yellow circles around the 
+-- interest points ]]
+-- }
 
    -- -- GoodFeaturesToTrack
    -- opencv.GoodFeaturesToTrack
@@ -393,7 +403,3 @@ if not opencvLoaded then
    -- 		end                     
    -- 	     end
 
-   opencvLoaded = true
-end
-
-     return opencv

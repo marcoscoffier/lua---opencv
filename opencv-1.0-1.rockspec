@@ -41,26 +41,22 @@ build = {
          message (STATUS "Found Torch7, installed in: " ${TORCH_PREFIX})
 
          find_package (Torch REQUIRED)
-	 FIND_PACKAGE(OpenCV)
+	 find_package (OpenCV REQUIRED)
 
          set (CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
-	 SET(src opencv.c) 
-	 SET(luasrc init.lua) 
+	 MESSAGE(STATUS "Found OpenCV")
+	 MESSAGE(STATUS "OpenCV libs: ${OpenCV_LIBS}")
+	 MESSAGE(STATUS "OpenCV include dirs: ${OpenCV_INCLUDE_DIRS}")
+   	 INCLUDE_DIRECTORIES (${TORCH_INCLUDE_DIR} ${PROJECT_SOURCE_DIR} ${OpenCV_INCLUDE_DIRS})
+   	 add_library(opencv SHARED opencv.c)
+	 MESSAGE(STATUS "TORCH_LIBRARY_DIR: ${TORCH_LIBRARY_DIR}")
+	 MESSAGE(STATUS "TORCH_LIBRARIES: ${TORCH_LIBRARIES}")
 
-	 IF(OpenCV_FOUND)
-	    MESSAGE(STATUS "Found OpenCV")
-	    MESSAGE(STATUS "OpenCV libs: ${OpenCV_LIBS}")
-	    MESSAGE(STATUS "OpenCV include dirs: ${OpenCV_INCLUDE_DIRS}")
-   	    INCLUDE_DIRECTORIES (${OpenCV_INCLUDE_DIRS} ${TORCH_INCLUDE_DIR} ${PROJECT_SOURCE_DIR})
-   	    add_library(opencv SHARED "${src}" "${luasrc}")
-	    link_directories (${TORCH_LIBRARY_DIR})
-   	    TARGET_LINK_LIBRARIES(opencv ${TORCH_LIBRARIES} ${OpenCV_LIBS})
-	    install_files(/lua/opencv init.lua)
-	    install_targets (/lib opencv)
-	 ELSE(OpenCV_FOUND)
-   	   MESSAGE("WARNING: Could not find OpenCV, OpenCV wrapper will not be installed")
-	 ENDIF(OpenCV_FOUND)
+	 link_directories (${TORCH_LIBRARY_DIR})
+	 target_link_libraries(opencv ${TORCH_LIBRARIES} ${OpenCV_LIBS})
+	 install_files(/lua/opencv init.lua)
+	 install_targets (/lib opencv) 
    ]],
 
    variables = {
