@@ -56,7 +56,10 @@ build = {
 	 link_directories (${TORCH_LIBRARY_DIR})
 	 target_link_libraries(opencv ${TORCH_LIBRARIES} ${OpenCV_LIBS})
 	 install_files(/lua/opencv init.lua)
-	 install_targets (/lib opencv) 
+	 install_files(/lua/opencv img1.jpg)
+	 install_files(/lua/opencv img2.jpg) 
+	 install_targets(/lib opencv) 
+
    ]],
 
    variables = {

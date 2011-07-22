@@ -48,7 +48,7 @@ static THTensor * libopencv_(Main_opencv2torch)(IplImage *source, THTensor *dest
   source_step /= sizeof(float);
 
   // Resize target
-  THTensor_(resize3d)(dest, source->nChannels, source->width, source->height);  
+  THTensor_(resize3d)(dest, source->nChannels, source->height, source->width);  
   THTensor *tensor = THTensor_(newContiguous)(dest,0);
 
   // copy
@@ -65,7 +65,7 @@ static IplImage * libopencv_(Main_torch2opencv_8U)(THTensor *source) {
   // Get size and channels
   int channels = source->size[0];
   int dest_step;
-  CvSize dest_size = cvSize(source->size[1], source->size[2]);
+  CvSize dest_size = cvSize(source->size[2], source->size[1]);
 
   // Create ipl image
   IplImage * dest = cvCreateImage(dest_size, IPL_DEPTH_8U, channels);
@@ -89,11 +89,10 @@ static int libopencv_(Main_cvCornerHarris) (lua_State *L) {
   if (image->size[0] > 1){
     printf("WARNING: CorverHarris only accepts single channel images\n");
   } else {
-    CvSize dest_size = cvSize(image->size[1], image->size[2]);
+    CvSize dest_size = cvSize(image->size[2], image->size[1]);
     IplImage * image_ipl = libopencv_(Main_torch2opencv_8U)(image);
     // Create ipl image
     IplImage * harris_ipl = cvCreateImage(dest_size, IPL_DEPTH_32F, 1);
-
     int blockSize = 5;
     int aperture_size = 3;
     double k = 0.04;
