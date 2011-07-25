@@ -3,11 +3,10 @@
        URL:http://opencv.willowgarage.com/
 
 ## currently wrapped packages
- + cvCalcOpticalFlowBM
- + cvCalcOpticalFlowHS
- + cvCalcOpticalFlowLK
- + cvHaarDetectObjects
- + cvCaptureFromCAM
- + cvSobel
- + cvCanny
+ + opencv.CornerHarris() [lua] --> cvCornerHarris [C/C++]
+
+ + opencv.CalcOpticalFlow() [lua] -->
+   - cvCalcOpticalFlowBM [C/C++]
+   - cvCalcOpticalFlowHS [C/C++]
+   - cvCalcOpticalFlowLK [C/C++]
 
