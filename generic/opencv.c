@@ -45,11 +45,10 @@ static THTensor * libopencv_(Main_opencv2torch)(IplImage *source, THTensor *dest
   int source_step;
   CvSize source_size;
   cvGetRawData(source, (uchar**)&source_data, &source_step, &source_size);
-  source_step /= sizeof(float);
 
   // Resize target
   THTensor_(resize3d)(dest, source->nChannels, source->height, source->width);  
-  THTensor *tensor = THTensor_(newContiguous)(dest,0);
+  THTensor *tensor = THTensor_(newContiguous)(dest);
 
   // copy
   TH_TENSOR_APPLY(real, tensor, *tensor_data = (real)(*source_data++););
@@ -73,9 +72,30 @@ static IplImage * libopencv_(Main_torch2opencv_8U)(THTensor *source) {
   // get pointer to raw data
   cvGetRawData(dest, (uchar**)&dest_data, &dest_step, &dest_size);
   // copy
-  THTensor *tensor = THTensor_(newContiguous)(source,0);
+  THTensor *tensor = THTensor_(newContiguous)(source);
   TH_TENSOR_APPLY(real, tensor, 
 		  *dest_data++ = (uchar)(*tensor_data * 255.0););
+  // return freshly created IPL image
+  return dest;
+}
+
+static IplImage * libopencv_(Main_torch2opencv_32F)(THTensor *source) {
+  // Pointers
+  uchar * dest_data;
+
+  // Get size and channels
+  int channels = source->size[0];
+  int dest_step;
+  CvSize dest_size = cvSize(source->size[2], source->size[1]);
+
+  // Create ipl image
+  IplImage * dest = cvCreateImage(dest_size, IPL_DEPTH_32F, channels);
+
+  // get pointer to raw data
+  cvGetRawData(dest, (uchar**)&dest_data, &dest_step, &dest_size);
+  // copy
+  THTensor *tensor = THTensor_(newContiguous)(source);
+  TH_TENSOR_APPLY(real, tensor, *dest_data++ = (float)(*tensor_data););
   // return freshly created IPL image
   return dest;
 }
@@ -117,6 +137,130 @@ static int libopencv_(Main_cvCornerHarris) (lua_State *L) {
     cvReleaseImage(&harris_ipl);
     cvReleaseImage(&image_ipl);
   }
+
+  return 0;
+}
+
+//============================================================
+// OpticalFlow
+// Works on torch.Tensors (double). All the conversions are
+// done in C.
+//
+static int libopencv_(Main_cvCalcOpticalFlow)(lua_State *L) {
+  // Get Tensor's Info
+  THTensor * curr = luaT_checkudata(L, 1, torch_(Tensor_id));  
+  THTensor * prev = luaT_checkudata(L, 2, torch_(Tensor_id));  
+  THTensor * velx = luaT_checkudata(L, 3, torch_(Tensor_id));  
+  THTensor * vely = luaT_checkudata(L, 4, torch_(Tensor_id));  
+
+  // Generate IPL images
+  IplImage * curr_ipl = libopencv_(Main_torch2opencv_8U)(curr);
+  IplImage * prev_ipl = libopencv_(Main_torch2opencv_8U)(prev);
+  IplImage * velx_ipl;
+  IplImage * vely_ipl;
+
+  // Default values
+  int method = 1;
+  int lagrangian = 1;
+  int iterations = 5;
+  CvSize blockSize = cvSize(7, 7);
+  CvSize shiftSize = cvSize(20, 20);
+  CvSize max_range = cvSize(20, 20);
+  int usePrevious = 0;
+
+  // User values:
+  if (lua_isnumber(L, 5)) {
+    method = lua_tonumber(L, 5);
+  }
+
+  // HS only:
+  if (lua_isnumber(L, 6)) {
+    lagrangian = lua_tonumber(L, 6);
+  }
+  if (lua_isnumber(L, 7)) {
+    iterations = lua_tonumber(L, 7);
+  }
+
+  // BM+LK only:
+  if (lua_isnumber(L, 6) && lua_isnumber(L, 7)) { 
+    blockSize.width = lua_tonumber(L, 6); 
+    blockSize.height = lua_tonumber(L, 7);
+  }
+  if (lua_isnumber(L, 8) && lua_isnumber(L, 9)) { 
+    shiftSize.width = lua_tonumber(L, 8); 
+    shiftSize.height = lua_tonumber(L, 9);
+  }
+  if (lua_isnumber(L, 10) && lua_isnumber(L, 11)) { 
+    max_range.width = lua_tonumber(L, 10); 
+    max_range.height = lua_tonumber(L, 11);
+  }
+  if (lua_isnumber(L, 12)) { 
+    usePrevious = lua_tonumber(L, 12); 
+  }  
+
+  // Compute flow
+  if (method == 1) 
+    {
+      // Alloc outputs
+      CvSize osize = cvSize((prev_ipl->width-blockSize.width)/shiftSize.width,
+                            (prev_ipl->height-blockSize.height)/shiftSize.height);
+
+      // Use previous results
+      if (usePrevious == 1) {
+        velx_ipl = libopencv_(Main_torch2opencv_32F)(velx);
+        vely_ipl = libopencv_(Main_torch2opencv_32F)(vely);
+      } else {
+        velx_ipl = cvCreateImage(osize, IPL_DEPTH_32F, 1);
+        vely_ipl = cvCreateImage(osize, IPL_DEPTH_32F, 1);
+      }
+
+      // Cv Call
+      cvCalcOpticalFlowBM(prev_ipl, curr_ipl, blockSize, shiftSize, 
+                          max_range, usePrevious, velx_ipl, vely_ipl);
+    }
+  else if (method == 2) 
+    {
+      // Alloc outputs
+      CvSize osize = cvSize(prev_ipl->width, prev_ipl->height);
+
+      velx_ipl = cvCreateImage(osize, IPL_DEPTH_32F, 1);
+      vely_ipl = cvCreateImage(osize, IPL_DEPTH_32F, 1);
+
+      // Cv Call
+      cvCalcOpticalFlowLK(prev_ipl, curr_ipl, blockSize, velx_ipl, vely_ipl);
+    }
+  else if (method == 3) 
+    {
+      // Alloc outputs
+      CvSize osize = cvSize(prev_ipl->width, prev_ipl->height);
+
+      // Use previous results
+      if (usePrevious == 1) {
+        velx_ipl = libopencv_(Main_torch2opencv_32F)(velx);
+        vely_ipl = libopencv_(Main_torch2opencv_32F)(vely);
+      } else {
+        velx_ipl = cvCreateImage(osize, IPL_DEPTH_32F, 1);
+        vely_ipl = cvCreateImage(osize, IPL_DEPTH_32F, 1);
+      }
+
+      // Iteration criterion
+      CvTermCriteria term = cvTermCriteria(CV_TERMCRIT_ITER, iterations, 0);
+
+      // Cv Call
+      cvCalcOpticalFlowHS(prev_ipl, curr_ipl, 
+			  usePrevious, velx_ipl, vely_ipl, 
+                          lagrangian, term);
+    }
+
+  // return results
+  libopencv_(Main_opencv2torch)(velx_ipl, velx);
+  libopencv_(Main_opencv2torch)(vely_ipl, vely);
+
+  // Deallocate IPL images
+  cvReleaseImage(&prev_ipl);
+  cvReleaseImage(&curr_ipl);
+  cvReleaseImage(&vely_ipl);
+  cvReleaseImage(&velx_ipl);
 
   return 0;
 }
@@ -716,128 +860,6 @@ static int libopencv_(Main_cvDrawFlowlinesOnImage) (lua_State *L) {
 }
 
 
-//============================================================
-// OpticalFlow
-// Works on torch.Tensors (double). All the conversions are
-// done in C.
-//
-static int libopencv_(Main_cvCalcOpticalFlow)(lua_State *L) {
-  // Get Tensor's Info
-  THTensor * curr = luaT_checkudata(L, 1, torch_(Tensor_id));  
-  THTensor * prev = luaT_checkudata(L, 2, torch_(Tensor_id));  
-  THTensor * velx = luaT_checkudata(L, 3, torch_(Tensor_id));  
-  THTensor * vely = luaT_checkudata(L, 4, torch_(Tensor_id));  
-
-  // Generate IPL images
-  IplImage * curr_ipl = torch2opencv_8U(curr);
-  IplImage * prev_ipl = torch2opencv_8U(prev);
-  IplImage * velx_ipl;
-  IplImage * vely_ipl;
-
-  // Default values
-  int method = 1;
-  int lagrangian = 1;
-  int iterations = 5;
-  CvSize blockSize = cvSize(7, 7);
-  CvSize shiftSize = cvSize(20, 20);
-  CvSize max_range = cvSize(20, 20);
-  int usePrevious = 0;
-
-  // User values:
-  if (lua_isnumber(L, 5)) {
-    method = lua_tonumber(L, 5);
-  }
-
-  // HS only:
-  if (lua_isnumber(L, 6)) {
-    lagrangian = lua_tonumber(L, 6);
-  }
-  if (lua_isnumber(L, 7)) {
-    iterations = lua_tonumber(L, 7);
-  }
-
-  // BM+LK only:
-  if (lua_isnumber(L, 6) && lua_isnumber(L, 7)) { 
-    blockSize.width = lua_tonumber(L, 6); 
-    blockSize.height = lua_tonumber(L, 7);
-  }
-  if (lua_isnumber(L, 8) && lua_isnumber(L, 9)) { 
-    shiftSize.width = lua_tonumber(L, 8); 
-    shiftSize.height = lua_tonumber(L, 9);
-  }
-  if (lua_isnumber(L, 10) && lua_isnumber(L, 11)) { 
-    max_range.width = lua_tonumber(L, 10); 
-    max_range.height = lua_tonumber(L, 11);
-  }
-  if (lua_isnumber(L, 12)) { 
-    usePrevious = lua_tonumber(L, 12); 
-  }  
-
-  // Compute flow
-  if (method == 1) 
-    {
-      // Alloc outputs
-      CvSize osize = cvSize((prev_ipl->width-blockSize.width)/shiftSize.width,
-                            (prev_ipl->height-blockSize.height)/shiftSize.height);
-
-      // Use previous results
-      if (usePrevious == 1) {
-        velx_ipl = torch2opencv_32F(velx);
-        vely_ipl = torch2opencv_32F(vely);
-      } else {
-        velx_ipl = cvCreateImage(osize, IPL_DEPTH_32F, 1);
-        vely_ipl = cvCreateImage(osize, IPL_DEPTH_32F, 1);
-      }
-
-      // Cv Call
-      cvCalcOpticalFlowBM(prev_ipl, curr_ipl, blockSize, shiftSize, 
-                          max_range, usePrevious, velx_ipl, vely_ipl);
-    }
-  else if (method == 2) 
-    {
-      // Alloc outputs
-      CvSize osize = cvSize(prev_ipl->width, prev_ipl->height);
-
-      velx_ipl = cvCreateImage(osize, IPL_DEPTH_32F, 1);
-      vely_ipl = cvCreateImage(osize, IPL_DEPTH_32F, 1);
-
-      // Cv Call
-      cvCalcOpticalFlowLK(prev_ipl, curr_ipl, blockSize, velx_ipl, vely_ipl);
-    }
-  else if (method == 3) 
-    {
-      // Alloc outputs
-      CvSize osize = cvSize(prev_ipl->width, prev_ipl->height);
-
-      // Use previous results
-      if (usePrevious == 1) {
-        velx_ipl = torch2opencv_32F(velx);
-        vely_ipl = torch2opencv_32F(vely);
-      } else {
-        velx_ipl = cvCreateImage(osize, IPL_DEPTH_32F, 1);
-        vely_ipl = cvCreateImage(osize, IPL_DEPTH_32F, 1);
-      }
-
-      // Iteration criterion
-      CvTermCriteria term = cvTermCriteria(CV_TERMCRIT_ITER, iterations, 0);
-
-      // Cv Call
-      cvCalcOpticalFlowHS(prev_ipl, curr_ipl, usePrevious, velx_ipl, vely_ipl, 
-                          lagrangian, term);
-    }
-
-  // return results
-  opencv2torch_32F(velx_ipl, velx);
-  opencv2torch_32F(vely_ipl, vely);
-
-  // Deallocate IPL images
-  cvReleaseImage(&prev_ipl);
-  cvReleaseImage(&curr_ipl);
-  cvReleaseImage(&vely_ipl);
-  cvReleaseImage(&velx_ipl);
-
-  return 0;
-}
 
 //============================================================
 // Other converters
@@ -1034,7 +1056,7 @@ static const luaL_reg libopencv_(Main__) [] =
   /* {"sobel",                libopencv_(Main_cvSobel)}, */
   /* {"captureFromCam",       libopencv_(Main_cvCaptureFromCAM)}, */
   /* {"releaseCam",           libopencv_(Main_cvReleaseCAM)}, */
-  /* {"calcOpticalFlow",      libopencv_(Main_cvCalcOpticalFlow)}, */
+  {"calcOpticalFlow",      libopencv_(Main_cvCalcOpticalFlow)},
   /* {"haarDetectObjects",    libopencv_(Main_cvHaarDetectObjects)}, */
   {"CornerHarris",         libopencv_(Main_cvCornerHarris)},
   /* {"GoodFeaturesToTrack",  libopencv_(Main_cvGoodFeaturesToTrack)}, */
