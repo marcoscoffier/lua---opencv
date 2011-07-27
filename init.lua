@@ -10,8 +10,10 @@
 --    - cvCalcOpticalFlowHS
 --    - cvCalcOpticalFlowLK
 --
+--  + opencv.GoodFeaturesToTrack() [lua] --> cvGoodFeaturesToTrack [C/C++]
+-- 
 -- Wrapper: Clement Farabet.
--- Additional functions GoodFeatures...()etc.: Marco Scoffier
+-- Additional functions: GoodFeatures...(),PLK,etc.: Marco Scoffier
 -- Adapted for torch7: Marco Scoffier
 -- 
 
@@ -76,13 +78,13 @@ end
 
 
 -- OpticalFlow:
-function opencv.calcOpticalFlow(...)
+function opencv.CalcOpticalFlow(...)
    local args, pair, method, block_w, block_h,
    shift_x, shift_y, window_w, window_h,
    lagrangian, iterations, autoscale,
    raw, reuse, flow_x, flow_y = xlua.unpack(
       {...},
-      'opencv.calcOpticalFlow', 
+      'opencv.CalcOpticalFlow', 
       [[
   Computes the optical flow of a pair of images, and returns 4 maps: 
   the flow field intensities, the flow field directions, and 
@@ -146,16 +148,16 @@ function opencv.calcOpticalFlow(...)
    local flow_y = flow_x or torch.Tensor()
 
    if method == 'BM' then
-      imageP.libopencv.calcOpticalFlow(imageN, imageP, flow_x, flow_y, 1,
+      imageP.libopencv.CalcOpticalFlow(imageN, imageP, flow_x, flow_y, 1,
 				block_w, block_h,
 				shift_x, shift_y,
 				window_w, window_h,
 				reuse)
    elseif method == 'LK' then
-      imageP.libopencv.calcOpticalFlow(imageN, imageP, flow_x, flow_y, 2,
+      imageP.libopencv.CalcOpticalFlow(imageN, imageP, flow_x, flow_y, 2,
 				block_w, block_h)
    elseif method == 'HS' then
-      imageP.libopencv.calcOpticalFlow(imageN, imageP, flow_x, flow_y, 3,
+      imageP.libopencv.CalcOpticalFlow(imageN, imageP, flow_x, flow_y, 3,
 				       lagrangian, iterations,
 					  -1,-1,-1,-1,
 				       reuse)
@@ -216,7 +218,7 @@ function opencv.calcOpticalFlow(...)
 end
 
 -- testers:
-function opencv.calcOpticalFlow_testme(img1, img2)
+function opencv.CalcOpticalFlow_testme(img1, img2)
    local img1 = img1
    local img2 = img2
    if not img1 then
@@ -233,7 +235,7 @@ function opencv.calcOpticalFlow_testme(img1, img2)
    for i,method in ipairs(methods) do
       print(i,method)
       local norm, angle, flow_x, flow_y = 
-	 opencv.calcOpticalFlow{pair={img1,img2}, method=method}
+	 opencv.CalcOpticalFlow{pair={img1,img2}, method=method}
       local hsl = torch.Tensor(3,img1:size(2), img1:size(3))
       hsl:select(1,1):copy(angle):div(360)
       hsl:select(1,2):copy(norm):div(math.max(norm:max(),1e-2))
@@ -248,11 +250,62 @@ function opencv.calcOpticalFlow_testme(img1, img2)
    end                     
 end
 
+-- GoodFeaturesToTrack
+opencv.GoodFeaturesToTrack
+   = function(...)
+	local args, image, count, quality, min_distance, win_size  = 
+	   xlua.unpack(
+	   {...},
+	   'opencv.GoodFeaturesToTrack',
+	   [[
+		 Computes the GoodFeatures algorithm of opencv.
+   		    + input img in which to find features 
+   		    + returns a points tensor of the sub-pixel positions of the features 
+		    and a copy of the input image with yellow circles around the interest points ]], 
+	   {arg='image', type='torch.Tensor', help='image in which to detect Good Feature points',req=true},
+	   {arg='count',type='number', help='number of points to return', default=500},
+	   {arg='quality',type='number', help='quality', default=0.01},
+	   {arg='min_distance',type='number', help='min spatial distance (in pixels) between returned feature points', default=10},
+	   {arg='win_size',type='number', help='window size over which to run heuristics', default=10}
+	)
+	local img = image
+	local img_out = torch.Tensor():resizeAs(img):copy(img)
+	local points = torch.Tensor(2,count)
+	local image_out = img.libopencv.GoodFeaturesToTrack(img,
+							points,
+							img_out,
+							count,
+							quality,
+							min_distance,
+							win_size)
+	return points, img_out
+     end
+
+-- testers:
+function opencv.GoodFeaturesToTrack_testme(img)
+   if not img then
+      img = opencv.imgL()
+   end
+   image.display{image=img,legend='before'}
+   local pts, iout = opencv.GoodFeaturesToTrack{image=img,count=125}
+   
+   image.display{image={img,iout},
+		 legends={'original image','Good Features'},
+		 legend='opencv: GoodFeaturesToTrack'}
+end
+
+function opencv.LowLevelConversions_testme()
+   local imgL = opencv.imgL()
+   local dstT = torch.Tensor()
+   imgL.libopencv.test_torch2IPL(imgL,dstT)
+end
+
 function opencv.testme()
-   local img1 = opencv.imgL()
-   local img2 = opencv.imgR()
-   opencv.CornerHarris_testme(img1)
-   opencv.calcOpticalFlow_testme(img1,img2)
+   local imgL = opencv.imgL()
+   local imgR = opencv.imgR()
+   opencv.CornerHarris_testme(imgL)
+   opencv.CalcOpticalFlow_testme(imgL,imgR)
+   opencv.GoodFeaturesToTrack(imgL)
 end
 
 -- local help = {
@@ -270,50 +323,6 @@ end
 -- and a copy of the input image with yellow circles around the 
 -- interest points ]]
 -- }
-
-   -- -- GoodFeaturesToTrack
-   -- opencv.GoodFeaturesToTrack
-   --    = function(...)
-   -- 	   local args, img, count, quality, min_distance, win_size  = 
-   -- 	      toolBox.unpack(
-   -- 	      {...},
-   -- 	      'opencv.GoodFeaturesToTrack',
-   -- 	      [[
-   -- 		    Computes the GoodFeatures algorithm of opencv.
-   -- 		    + input img in which to find features 
-   -- 		    + returns a points tensor of the sub-pixel positions of the features 
-   -- 		       and a copy of the input image with yellow circles around the interest points ]], 
-   -- 	      {arg='img', type='torch.Tensor', help='image in which to detect Good Feature points',req=true},
-   -- 	      {arg='count',type='number', help='number of points to return', default=500},
-   -- 	      {arg='quality',type='number', help='quality', default=0.01},
-   -- 	      {arg='min_distance',type='number', help='min spatial distance (in pixels) between returned feature points', default=10},
-   -- 	      {arg='win_size',type='number', help='window size over which to run heuristics', default=10}
-   -- 	   )
-   -- 	   local img = img
-   -- 	   local img_out = torch.Tensor():resizeAs(img):copy(img)
-   -- 	   local points = torch.Tensor(count,2)
-   -- 	   local image_out = libopencv.GoodFeaturesToTrack(img,
-   -- 							   points,
-   -- 							   img_out,
-   -- 							   count,
-   -- 							   quality,
-   -- 							   min_distance,
-   -- 							   win_size)
-   -- 	   return points, img_out
-   -- 	end
-
-   -- -- testers:
-   -- opencv.test_GoodFeaturesToTrack
-   --    = function()
-   -- 	   local a = image.load(paths.concat(paths.install_lua_path, 'opticalFlow/img1.jpg'))
-	   
-   -- 	   local pts, iout = opencv.GoodFeaturesToTrack{img=a,count=125}
-
-   -- 	   image.displayList{images={a,iout},
-   -- 			     legends={'original image','Good Features'},
-   -- 			     legend='opencv: GoodFeaturesToTrack',
-   -- 			     win_w=a:size(1)*2,win_h=a:size(2)}
-   -- 	end                     
 
    -- -- Pyramidal Lucas-Kanade
    -- opencv.TrackPyrLK
