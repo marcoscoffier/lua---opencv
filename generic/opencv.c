@@ -464,6 +464,126 @@ static int libopencv_(Main_cvGoodFeaturesToTrack) (lua_State *L) {
   return 0;
 }
 
+//============================================================
+static int libopencv_(Main_cvCalcOpticalFlowPyrLK) (lua_State *L) {
+  // Get Tensor's Info
+  THTensor * image1 = luaT_checkudata(L, 1, torch_(Tensor_id));  
+  THTensor * image2 = luaT_checkudata(L, 2, torch_(Tensor_id));  
+  THTensor * flow_x = luaT_checkudata(L, 3, torch_(Tensor_id));  
+  THTensor * flow_y = luaT_checkudata(L, 4, torch_(Tensor_id));  
+  THTensor * points = luaT_checkudata(L, 5, torch_(Tensor_id));  
+  THTensor * image_out = luaT_checkudata(L, 6, torch_(Tensor_id));  
+  
+  printf("Parsed args\n");
+  int count = 500;
+  double quality = 0.01;
+  double min_distance = 10;
+  int win_size = 10;  
+
+  // User values:
+  if (lua_isnumber(L, 7)) {
+    count = lua_tonumber(L, 7);
+  }
+  if (lua_isnumber(L, 8)) {
+    quality = lua_tonumber(L, 8);
+  }
+  if (lua_isnumber(L, 9)) {
+    min_distance = lua_tonumber(L, 9);
+  }
+  if (lua_isnumber(L, 10)) {
+    win_size = lua_tonumber(L, 10);
+  }
+  printf("updated defaults\n");
+  printf("size: (%ld,%ld)\n",image1->size[2], image1->size[1]);
+  CvSize dest_size = cvSize(image1->size[2], image1->size[1]);
+  IplImage * image1_ipl    = libopencv_(Main_torch2opencv_8U)(image1);
+  IplImage * image2_ipl    = libopencv_(Main_torch2opencv_8U)(image2);
+  THTensor_(resize3d)(image_out, 
+		      image1->size[0],image1->size[1],image1->size[2]);
+  IplImage * image_out_ipl = libopencv_(Main_torch2opencv_8U)(image_out);
+  printf("converted images\n");
+
+  IplImage * grey1 = cvCreateImage( dest_size, 8, 1 );
+  IplImage * grey2 = cvCreateImage( dest_size, 8, 1 );
+
+  cvCvtColor( image1_ipl, grey1, CV_BGR2GRAY );
+  cvCvtColor( image2_ipl, grey2, CV_BGR2GRAY );
+  CvPoint2D32f* points1_cv = 0;
+  CvPoint2D32f* points2_cv = 0;
+
+  printf("Created IPL structures\n");
+  IplImage* eig = cvCreateImage( dest_size, 32, 1 );
+  IplImage* temp = cvCreateImage( dest_size, 32, 1 );
+
+  // FIXME reuse points
+  points1_cv = (CvPoint2D32f*)cvAlloc(count*sizeof(points1_cv[0]));
+  points2_cv = (CvPoint2D32f*)cvAlloc(count*sizeof(points2_cv[0]));
+
+  printf("Malloced points\n");
+  cvGoodFeaturesToTrack( grey1, eig, temp, points1_cv, &count,
+			 quality, min_distance, 0, 3, 0, 0.04 );
+  printf("got good features for points1\n");
+  /*
+  cvFindCornerSubPix( grey1, points1_cv, count,
+		      cvSize(win_size,win_size), 
+		      cvSize(-1,-1),
+		      cvTermCriteria(CV_TERMCRIT_ITER|CV_TERMCRIT_EPS,
+				     20,0.03));
+  printf("Found SubPixel\n");
+  */
+  // Call Lucas Kanade algorithm
+  char features_found[ count ];
+  float feature_errors[ count ];
+  CvSize pyr_sz = cvSize( image1_ipl->width+8, image1_ipl->height/3 );
+
+  IplImage* pyrA = cvCreateImage( pyr_sz, IPL_DEPTH_32F, 1 );
+  IplImage* pyrB = cvCreateImage( pyr_sz, IPL_DEPTH_32F, 1 );
+  
+  cvCalcOpticalFlowPyrLK( grey1, grey2, 
+			  pyrA, pyrB, 
+			  points1_cv, points2_cv, 
+			  count, 
+			  cvSize( win_size, win_size ), 
+			  5, features_found, feature_errors,
+			  cvTermCriteria( CV_TERMCRIT_ITER | CV_TERMCRIT_EPS, 20, 0.3 ), 0 );
+  // make image
+  int i;
+  for( i = 0; i < count; i++ ) {
+    if (features_found[i] >0){
+      CvPoint p0 = cvPoint( cvRound( points1_cv[i].x), 
+			    cvRound( points1_cv[i].y));
+      CvPoint p1 = cvPoint( cvRound( points2_cv[i].x), 
+			    cvRound( points2_cv[i].y));
+      cvLine( image_out_ipl, p0, p1, CV_RGB(255,0,0), 1, CV_AA, 0);
+      //create the flow vectors to be compatible with the other
+      //opticalFlows
+      if (((p1.x > 0) && (p1.x < flow_x->size[0])) &&
+	  ((p1.y > 0) && (p1.y < flow_x->size[1]))) {
+	THTensor_(set2d)(flow_x,p1.x,p1.y,points1_cv[i].x - points2_cv[i].x);
+	THTensor_(set2d)(flow_y,p1.x,p1.y,points1_cv[i].y - points2_cv[i].y);
+      }
+    }
+  }
+  
+  // return results
+  libopencv_(Main_opencvPoints2torch)(points2_cv, count, points);
+  libopencv_(Main_opencv8U2torch)(image_out_ipl, image_out);
+
+  // Deallocate points_cv
+  cvFree(&points1_cv);
+  cvFree(&points2_cv);
+  cvReleaseImage( &eig );
+  cvReleaseImage( &temp );
+  cvReleaseImage( &pyrA );
+  cvReleaseImage( &pyrB );
+  cvReleaseImage( &grey1 );
+  cvReleaseImage( &grey2);
+  cvReleaseImage( &image1_ipl );
+  cvReleaseImage( &image2_ipl );
+  cvReleaseImage( &image_out_ipl );
+
+  return 0;
+}
 
 #if 0
 //============================================================
@@ -825,119 +945,6 @@ static int libopencv_(Main_cvTrackPyrLK) (lua_State *L) {
   return 0;
 }
 
-//============================================================
-static int libopencv_(Main_cvCalcOpticalFlowPyrLK) (lua_State *L) {
-  // Get Tensor's Info
-  THTensor * image1 = luaT_checkudata(L, 1, torch_(Tensor_id));  
-  THTensor * image2 = luaT_checkudata(L, 2, torch_(Tensor_id));  
-  THTensor * flow_x = luaT_checkudata(L, 3, torch_(Tensor_id));  
-  THTensor * flow_y = luaT_checkudata(L, 4, torch_(Tensor_id));  
-  THTensor * points = luaT_checkudata(L, 5, torch_(Tensor_id));  
-  THTensor * image_out = luaT_checkudata(L, 6, torch_(Tensor_id));  
-  
-
-  int count = 500;
-  double quality = 0.01;
-  double min_distance = 10;
-  int win_size = 10;  
-
-  // User values:
-  if (lua_isnumber(L, 7)) {
-    count = lua_tonumber(L, 7);
-  }
-  if (lua_isnumber(L, 8)) {
-    quality = lua_tonumber(L, 8);
-  }
-  if (lua_isnumber(L, 9)) {
-    min_distance = lua_tonumber(L, 9);
-  }
-  if (lua_isnumber(L, 10)) {
-    win_size = lua_tonumber(L, 10);
-  }
-
-  CvSize dest_size = cvSize(image1->size[0], image1->size[1]);
-  IplImage * image1_ipl = torch2opencv_8U(image1);
-  IplImage * image2_ipl = torch2opencv_8U(image2);
-  IplImage * image_out_ipl = torch2opencv_8U(image_out);
-
-
-  IplImage * grey1 = cvCreateImage( dest_size, 8, 1 );
-  IplImage * grey2 = cvCreateImage( dest_size, 8, 1 );
-
-  cvCvtColor( image1_ipl, grey1, CV_BGR2GRAY );
-  cvCvtColor( image2_ipl, grey2, CV_BGR2GRAY );
-  CvPoint2D32f* points1_cv = 0;
-  CvPoint2D32f* points2_cv = 0;
-
-
-  IplImage* eig = cvCreateImage( dest_size, 32, 1 );
-  IplImage* temp = cvCreateImage( dest_size, 32, 1 );
-
-  // FIXME reuse points
-  points1_cv = (CvPoint2D32f*)cvAlloc(count*sizeof(points1_cv[0]));
-  points2_cv = (CvPoint2D32f*)cvAlloc(count*sizeof(points2_cv[0]));
-
-  cvGoodFeaturesToTrack( grey1, eig, temp, points1_cv, &count,
-			 quality, min_distance, 0, 3, 0, 0.04 );
-  
-  cvFindCornerSubPix( grey1, points1_cv, count,
-		      cvSize(win_size,win_size), 
-		      cvSize(-1,-1),
-		      cvTermCriteria(CV_TERMCRIT_ITER|CV_TERMCRIT_EPS,
-				     20,0.03));
-  // Call Lucas Kanade algorithm
-  char features_found[ count ];
-  float feature_errors[ count ];
-  CvSize pyr_sz = cvSize( image1_ipl->width+8, image1_ipl->height/3 );
-
-  IplImage* pyrA = cvCreateImage( pyr_sz, IPL_DEPTH_32F, 1 );
-  IplImage* pyrB = cvCreateImage( pyr_sz, IPL_DEPTH_32F, 1 );
-  
-  cvCalcOpticalFlowPyrLK( grey1, grey2, 
-			  pyrA, pyrB, 
-			  points1_cv, points2_cv, 
-			  count, 
-			  cvSize( win_size, win_size ), 
-			  5, features_found, feature_errors,
-			  cvTermCriteria( CV_TERMCRIT_ITER | CV_TERMCRIT_EPS, 20, 0.3 ), 0 );
-  // make image
-  int i;
-  for( i = 0; i < count; i++ ) {
-    if (features_found[i] >0){
-      CvPoint p0 = cvPoint( cvRound( points1_cv[i].x), 
-			    cvRound( points1_cv[i].y));
-      CvPoint p1 = cvPoint( cvRound( points2_cv[i].x), 
-			    cvRound( points2_cv[i].y));
-      cvLine( image_out_ipl, p0, p1, CV_RGB(255,0,0), 1, CV_AA, 0);
-      //create the flow vectors to be compatible with the other
-      //opticalFlows
-      if (((p1.x > 0) && (p1.x < flow_x->size[0])) &&
-	  ((p1.y > 0) && (p1.y < flow_x->size[1]))) {
-	THTensor_set2d(flow_x,p1.x,p1.y,points1_cv[i].x - points2_cv[i].x);
-	THTensor_set2d(flow_y,p1.x,p1.y,points1_cv[i].y - points2_cv[i].y);
-      }
-    }
-  }
-  
-  // return results
-  opencvPoints2torch_32F(points2_cv, count, points);
-  opencv2torch_8U(image_out_ipl, image_out);
-
-  // Deallocate points_cv
-  cvFree(&points1_cv);
-  cvFree(&points2_cv);
-  cvReleaseImage( &eig );
-  cvReleaseImage( &temp );
-  cvReleaseImage( &pyrA );
-  cvReleaseImage( &pyrB );
-  cvReleaseImage( &grey1 );
-  cvReleaseImage( &grey2);
-  cvReleaseImage( &image1_ipl );
-  cvReleaseImage( &image2_ipl );
-  cvReleaseImage( &image_out_ipl );
-
-  return 0;
-}
 
 //============================================================
 // draws red flow lines on an image (for visualizing the flow)
@@ -1172,9 +1179,9 @@ static const luaL_reg libopencv_(Main__) [] =
   /* {"captureFromCam",       libopencv_(Main_cvCaptureFromCAM)}, */
   /* {"releaseCam",           libopencv_(Main_cvReleaseCAM)}, */
   /* {"haarDetectObjects",    libopencv_(Main_cvHaarDetectObjects)}, */
-  /* {"TrackPyrLK",           libopencv_(Main_cvTrackPyrLK)}, */
-  /* {"calcOpticalFlowPyrLK", libopencv_(Main_cvCalcOpticalFlowPyrLK)}, */
   /* {"drawFlowlinesOnImage", libopencv_(Main_cvDrawFlowlinesOnImage)}, */
+  /* {"TrackPyrLK",           libopencv_(Main_cvTrackPyrLK)}, */
+  {"CalcOpticalFlowPyrLK",  libopencv_(Main_cvCalcOpticalFlowPyrLK)},
   {"CalcOpticalFlow",       libopencv_(Main_cvCalcOpticalFlow)},
   {"CornerHarris",          libopencv_(Main_cvCornerHarris)},
   {"GoodFeaturesToTrack",   libopencv_(Main_cvGoodFeaturesToTrack)},

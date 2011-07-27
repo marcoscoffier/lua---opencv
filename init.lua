@@ -293,6 +293,21 @@ function opencv.GoodFeaturesToTrack_testme(img)
 		 legend='opencv: GoodFeaturesToTrack'}
 end
 
+function opencv.CalcOpticalFlowPyrLK_testme(imgL,imgR)
+   if not imgL then
+      imgL = opencv.imgL()
+   end
+   if not imgR then
+      imgR = opencv.imgR()
+   end
+   local flowx = torch.Tensor(imgL:size(1),imgL:size(2)):zero()
+   local flowy = torch.Tensor(imgL:size(1),imgL:size(2)):zero()
+   local points = torch.Tensor(500,2)
+   local image_out = torch.Tensor():resizeAs(imgR):copy(imgR)
+   imgL.libopencv.CalcOpticalFlowPyrLK(imgL,imgR,flowx,flowy,points,image_out)
+   image.display(image_out)
+end
+
 function opencv.LowLevelConversions_testme(img)
    if not img then
       img = opencv.imgL()
