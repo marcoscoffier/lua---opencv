@@ -286,23 +286,41 @@ function opencv.GoodFeaturesToTrack_testme(img)
    if not img then
       img = opencv.imgL()
    end
-   image.display{image=img,legend='before'}
    local pts, iout = opencv.GoodFeaturesToTrack{image=img,count=125}
    
-   image.display{image={img,iout},
-		 legends={'original image','Good Features'},
+   image.display{image=iout,
+		 legends={'Good Features'},
 		 legend='opencv: GoodFeaturesToTrack'}
 end
 
-function opencv.LowLevelConversions_testme()
-   local imgL = opencv.imgL()
-   local dstT = torch.Tensor()
-   imgL.libopencv.test_torch2IPL(imgL,dstT)
+function opencv.LowLevelConversions_testme(img)
+   if not img then
+      img = opencv.imgL()
+   end
+   local dst = torch.Tensor() 
+   print('Testing torch>IPL8U ...')
+   img.libopencv.test_torch2IPL8U(img,dst)
+   local err = (img-dst):max() 
+   if err > 1/255 then 
+      print ('  ERROR '..err) 
+   else 
+      print ('  OK') 
+   end 
+   print('Testing torch>IPL32F ...')
+   dst = torch.Tensor()
+   img.libopencv.test_torch2IPL32F(img,dst)
+   err = (img-dst):max() 
+   if  err > 0 then 
+      print ('  ERROR '..err) 
+   else 
+      print ('  OK') 
+   end 
 end
 
 function opencv.testme()
    local imgL = opencv.imgL()
    local imgR = opencv.imgR()
+   opencv.LowLevelConversions_testme(imgL)
    opencv.CornerHarris_testme(imgL)
    opencv.CalcOpticalFlow_testme(imgL,imgR)
    opencv.GoodFeaturesToTrack(imgL)

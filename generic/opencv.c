@@ -60,7 +60,7 @@ static THTensor * libopencv_(Main_opencv8U2torch)(IplImage *source, THTensor *de
     THTensor *tslice = THTensor_(newSelect)(tensor,0,j);
     // copy
     TH_TENSOR_APPLY(real, tslice, 
-		    *tslice_data = (real)(*sourcep)/255.0;
+		    *tslice_data = ((real)(*sourcep))/255.0;
 		    // step through channels of ipl
 		    sourcep = sourcep + source->nChannels; 
 		    );
@@ -81,6 +81,7 @@ static THTensor * libopencv_(Main_opencv32F2torch)(IplImage *source, THTensor *d
   // Resize target
   THTensor_(resize3d)(dest, source->nChannels, source->height, source->width);  
   THTensor *tensor = THTensor_(newContiguous)(dest);
+
   // Torch stores channels first, opencv last so we select the channel
   // in torch tensor and step through the opencv iplimage.
   int j = 0;
@@ -124,31 +125,13 @@ static IplImage * libopencv_(Main_torch2opencv_8U)(THTensor *source) {
   for (j=0;j<dest->nChannels;j++){
     i=0;
     destp = dest_data+k-j; // start at correct channel opencv is BGR
-    printf("dest start: %p of %p\n",(void *)destp,(void *)dest_data);
     THTensor *tslice = THTensor_(newSelect)(tensor,0,j);
     // copy
     TH_TENSOR_APPLY(real, tslice, 
 		    *destp = (uchar)(*tslice_data * 255.0);
-		    /*
-		    if ((i>0)&&(i%100000 == 0)){
-		      printf("ch: %d p[%d] = %d(%p) <- %f(%p)\n",j,i,
-			     *destp,(void *)destp,
-			     (*tslice_data)*255.0,(void *)tslice_data);
-		      printf("ch: %d p[%d] = %d(%p) <- %f(%p)\n",j,i-1,
-			     *(destp-3),(void *)(destp-3),
-			     (*(tslice_data-1))*255.0,
-			     (void *)(tslice_data-1));
-		    }
-		    i++;
-		    */
 		    // step through ipl
 		    destp = destp + dest->nChannels; 
 		    );
-    real *tslice_data = THTensor_(data)(tslice);
-    printf("channel %d torch: %f %f ipl: %f %d\n",j,
-	   *tslice_data,(*tslice_data) * 255.0,
-	   (*(dest_data+k-j))/255.0,*(dest_data+k-j));
-    
   }
   // return freshly created IPL image
   return dest;
@@ -156,7 +139,7 @@ static IplImage * libopencv_(Main_torch2opencv_8U)(THTensor *source) {
 
 static IplImage * libopencv_(Main_torch2opencv_32F)(THTensor *source) {
   // Pointers
-  uchar * dest_data;
+  float * dest_data;
 
   // Get size and channels
   int channels = source->size[0];
@@ -174,7 +157,7 @@ static IplImage * libopencv_(Main_torch2opencv_32F)(THTensor *source) {
   // in torch tensor and step through the opencv iplimage.
   int j = 0;
   int k = channels-1;
-  uchar * destp = dest_data;
+  float * destp = dest_data;
   for (j=0;j<dest->nChannels;j++){
     destp = dest_data+k-j; // start at correct channel opencv is BGR
     THTensor *tslice = THTensor_(newSelect)(tensor,0,j);
@@ -206,7 +189,7 @@ static THTensor * libopencv_(Main_opencvPoints2torch)(CvPoint2D32f * points, int
   return tensor;
 }
 
-static int libopencv_(Main_testTH2IPL32F)(lua_State *L) {
+static int libopencv_(Main_testTH2IPL8U)(lua_State *L) {
   THTensor * src  = luaT_checkudata(L, 1, torch_(Tensor_id));  
   THTensor * dst  = luaT_checkudata(L, 2, torch_(Tensor_id));  
   IplImage * ipl = libopencv_(Main_torch2opencv_8U)(src);
@@ -214,10 +197,33 @@ static int libopencv_(Main_testTH2IPL32F)(lua_State *L) {
 
   libopencv_(Main_opencv8U2torch)(ipl, dst);
   real *dst_data = THTensor_(data)(dst);
+  /*
+  printf("src (%f,%f,%f) ", src_data[0],src_data[1],src_data[2]);
+  printf("ipl (%f,%f,%f)", 
+	 ((uchar)ipl->imageData[2])/255.0,
+	 ((uchar)ipl->imageData[2+3])/255.0,
+	 ((uchar)ipl->imageData[2+6])/255.0);
+  printf("dst(%f,%f,%f)\n", dst_data[0],dst_data[1],dst_data[2]);
+  */
+  cvReleaseImage(&ipl);
+  return 0;
+}
+static int libopencv_(Main_testTH2IPL32F)(lua_State *L) {
+  THTensor * src  = luaT_checkudata(L, 1, torch_(Tensor_id));  
+  THTensor * dst  = luaT_checkudata(L, 2, torch_(Tensor_id));  
+  IplImage * ipl = libopencv_(Main_torch2opencv_32F)(src);
+  real *src_data = THTensor_(data)(src);
 
-  printf("src (%f,%f,%f) ", src_data[300],src_data[301],src_data[302]);
-  printf("ipl (%d,%d,%d)", (uchar)ipl->imageData[300],(uchar)ipl->imageData[301],(uchar)ipl->imageData[302]);
-  printf("dst(%f,%f,%f)\n", dst_data[300],dst_data[301],dst_data[302]);
+  libopencv_(Main_opencv32F2torch)(ipl, dst);
+  real *dst_data = THTensor_(data)(dst);
+  /*
+  printf("src (%f,%f,%f) ", src_data[0],src_data[1],src_data[2]);
+  printf("ipl (%f,%f,%f)", 
+	 ((uchar)ipl->imageData[2])/255.0,
+	 ((uchar)ipl->imageData[2+3])/255.0,
+	 ((uchar)ipl->imageData[2+6])/255.0);
+  printf("dst(%f,%f,%f)\n", dst_data[0],dst_data[1],dst_data[2]);
+  */
   cvReleaseImage(&ipl);
   return 0;
 }
@@ -425,37 +431,28 @@ static int libopencv_(Main_cvGoodFeaturesToTrack) (lua_State *L) {
     win_size = lua_tonumber(L, 7);
   }
 
-  printf("OK create temp data\n");
-
   points_cv = (CvPoint2D32f*)cvAlloc(count*sizeof(points_cv[0]));
 
-  printf("OK cvAlloc\n");
   cvGoodFeaturesToTrack( grey, eig, temp, points_cv, &count,
 			 quality, min_distance, 0, 3, 0, 0.04 );
   
-  int i = 0;
-  printf("Count: %d\n",count);
-  for (i=0;i<count;i++){
-    printf("p[%d]=(%f,%f)\n", i, points_cv[i].x, points_cv[i].y);
-  }
   /*
+    // this function is Seq Faulting (not sure why...)
   cvFindCornerSubPix( grey, points_cv, count,
   		      cvSize(win_size,win_size),
   		      cvSize(-1,-1),
   		      cvTermCriteria(CV_TERMCRIT_ITER|CV_TERMCRIT_EPS,
   				     20,0.03));
   */
-  printf("OK FindCornerSubPix\n");
+  int i = 0;
   for( i = 0; i < count; i++ ) {
     cvCircle( image_out_ipl, cvPointFrom32f(points_cv[i]), 25, 
 	      CV_RGB(0,255,0), 1, 8,0);
   }
-  printf("OK make iout\n");
   // return results
   points = libopencv_(Main_opencvPoints2torch)(points_cv, count, points);
   libopencv_(Main_opencv8U2torch)(image_out_ipl, image_out);
 
-  printf("OK copy data out\n");
   // Deallocate points_cv
   cvFree(&points_cv);
   cvReleaseImage( &eig );
@@ -1171,18 +1168,19 @@ static const luaL_reg libopencv_(Main__) [] =
 {
   /* {"canny",                libopencv_(Main_cvCanny)}, */
   /* {"sobel",                libopencv_(Main_cvSobel)}, */
+  //  {"HoG", libopencv_(Main_cvhog},
   /* {"captureFromCam",       libopencv_(Main_cvCaptureFromCAM)}, */
   /* {"releaseCam",           libopencv_(Main_cvReleaseCAM)}, */
-  {"CalcOpticalFlow",      libopencv_(Main_cvCalcOpticalFlow)},
   /* {"haarDetectObjects",    libopencv_(Main_cvHaarDetectObjects)}, */
-  {"CornerHarris",         libopencv_(Main_cvCornerHarris)},
-  {"GoodFeaturesToTrack",  libopencv_(Main_cvGoodFeaturesToTrack)},
   /* {"TrackPyrLK",           libopencv_(Main_cvTrackPyrLK)}, */
   /* {"calcOpticalFlowPyrLK", libopencv_(Main_cvCalcOpticalFlowPyrLK)}, */
   /* {"drawFlowlinesOnImage", libopencv_(Main_cvDrawFlowlinesOnImage)}, */
-  {"test_torch2IPL",       libopencv_(Main_testTH2IPL32F)},
+  {"CalcOpticalFlow",       libopencv_(Main_cvCalcOpticalFlow)},
+  {"CornerHarris",          libopencv_(Main_cvCornerHarris)},
+  {"GoodFeaturesToTrack",   libopencv_(Main_cvGoodFeaturesToTrack)},
+  {"test_torch2IPL32F",     libopencv_(Main_testTH2IPL32F)},
+  {"test_torch2IPL8U",      libopencv_(Main_testTH2IPL8U)},
   {NULL, NULL}  /* sentinel */
-  //  {"HoG", libopencv_(Main_cvhog},
 };
 
 DLL_EXPORT int libopencv_(Main_init) (lua_State *L) {
