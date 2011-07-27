@@ -297,8 +297,18 @@ function opencv.LowLevelConversions_testme(img)
    if not img then
       img = opencv.imgL()
    end
+   local imgn = img:narrow(1,1,1)
    local dst = torch.Tensor() 
-   print('Testing torch>IPL8U ...')
+   
+   print('Testing torch>IPL8U ... 1 Channel')
+   img.libopencv.test_torch2IPL8U(imgn,dst)
+   local err = (imgn-dst):max() 
+   if err > 1/255 then 
+      print ('  ERROR '..err) 
+   else 
+      print ('  OK') 
+   end 
+   print('Testing torch>IPL8U ... 3 Channels')
    img.libopencv.test_torch2IPL8U(img,dst)
    local err = (img-dst):max() 
    if err > 1/255 then 
@@ -306,7 +316,16 @@ function opencv.LowLevelConversions_testme(img)
    else 
       print ('  OK') 
    end 
-   print('Testing torch>IPL32F ...')
+   print('Testing torch>IPL32F ... 1 Channel')
+   dst = torch.Tensor()
+   img.libopencv.test_torch2IPL32F(imgn,dst)
+   err = (imgn-dst):max() 
+   if  err > 0 then 
+      print ('  ERROR '..err) 
+   else 
+      print ('  OK') 
+   end 
+   print('Testing torch>IPL32F ... 3 Channels')
    dst = torch.Tensor()
    img.libopencv.test_torch2IPL32F(img,dst)
    err = (img-dst):max() 
