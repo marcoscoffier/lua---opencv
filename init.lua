@@ -145,7 +145,7 @@ function opencv.CalcOpticalFlow(...)
    end
 
    local flow_x = flow_x or torch.Tensor()
-   local flow_y = flow_x or torch.Tensor()
+   local flow_y = flow_y or torch.Tensor()
 
    if method == 'BM' then
       imageP.libopencv.CalcOpticalFlow(imageN, imageP, flow_x, flow_y, 1,
@@ -245,6 +245,7 @@ function opencv.CalcOpticalFlow_testme(img1, img2)
 		    legend='cvOpticalFLow, method = ' .. method,
 		    legends={'input 1', 'input2', 'HSL-mapped flow'}}
       image.display{image={norm,angle,flow_x,flow_y},
+                    scaleeach=true,
 		    legend='cvOpticalFLow, method = ' .. method,
 		    legends={'norm','angle', 'flow x', 'flow y'}}
    end                     
