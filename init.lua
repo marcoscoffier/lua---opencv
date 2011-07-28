@@ -372,6 +372,66 @@ function opencv.LowLevelConversions_testme(img)
    end 
 end
 
+
+-- Pyramidal Lucas-Kanade
+opencv.TrackPyrLK
+   = function(...)
+	local args, pair, points_in, win_size  = xlua.unpack(
+	   {...},
+	   'opencv.TrackPyrLK',
+	   [[
+		 Runs pyramidal Lucas-Kanade, on two input images and a set of points
+		 which are meant to be tracked ]],
+	   {arg='pair', type='table', help='a pair of images (2 WxHx1 tensor)', req=true},
+	   {arg='points_in',type='torch.Tensor', help='points to track', req=true},
+	   {arg='win_size',type='number',help='over how large of a window can the LK track', default= 25}
+	)
+	local points_out = torch.Tensor():resizeAs(points_in):zero()
+	local feature_found = torch.Tensor(points_in:size(1)):zero()
+	local feature_error = torch.Tensor(points_in:size(1)):zero()
+	pair[1].libopencv.TrackPyrLK(pair[1], pair[2], points_in, points_out, win_size, feature_found, feature_error)
+	   
+	return points_out, feature_found, feature_error
+     end
+
+opencv.drawFlowlinesOnImage
+   = function (...)
+	local args, pair, image = xlua.unpack(
+	   {...},
+	   'opencv.drawFlowlinesOnImage',
+	   [[ utility to visualize sparse flows ]],
+	   {arg='pair', type='table', help='a pair of point tensors (2 nPointsx2 tensor)', req=true},
+	   {arg='image', type='torch.Tensor',help='image on which to draw the flowlines', req=true},
+	   {arg='color', type='torch.Tensor',help='color of flow line eg. R = [255,0,0]'},
+	   {arg='mask', type='torch.Tensor',help='mask tensor 1D npoints 0 when not to draw point'}
+	)
+	if not color then
+	   color = torch.Tensor(3):zero()
+	   color[1] = 255 
+	end
+	pair[1].libopencv.drawFlowlinesOnImage(pair[1],pair[2],image,color,mask)
+     end
+
+
+function opencv.TrackPyrLK_testme(imgL,imgR)
+   if not imgL then
+      imgL = opencv.imgL()
+   end
+   if not imgR then
+      imgR = opencv.imgR()
+   end
+   local ptsin = opencv.GoodFeaturesToTrack{image=imgL,count=imgL:nElement()}
+   
+   local ptsout = opencv.TrackPyrLK{pair={imgL,imgR},points_in=ptsin}
+   opencv.drawFlowlinesOnImage({ptsin,ptsout},imgR)
+   image.display{image={imgL,imgR},
+		 legends={'previous image',
+			  'current image w/ flowlines',
+			  'Optical Flow Pyramidal LK Tracking'},
+		 legend='opencv: Optical Flow Pyramidal LK Tracking',
+		 win_w=imgL:size(1)*2,win_h=imgL:size(2)}
+end
+
 function opencv.testme()
    local imgL = opencv.imgL()
    local imgR = opencv.imgR()
@@ -379,79 +439,9 @@ function opencv.testme()
    opencv.CornerHarris_testme(imgL)
    opencv.CalcOpticalFlow_testme(imgL,imgR)
    opencv.GoodFeaturesToTrack(imgL)
+   opencv.TrackPyrLK_testme(imgL,imgR)
 end
 
--- local help = {
-
---    CornerHarris = [[
-
---    TrackPyrLK = [[
--- Runs pyramidal Lucas-Kanade, on two input images and a set of points
--- which are meant to be tracked ]],
-
---    calcOpticalFlowPyrLK = [[
--- Computes the optical flow of a pair of images using the Pyramidal 
--- Lucas-Kanade algorithm on a set of interest points.
--- Returns a points tensor of the sub-pixel positions of the features 
--- and a copy of the input image with yellow circles around the 
--- interest points ]]
--- }
-
-   -- -- Pyramidal Lucas-Kanade
-   -- opencv.TrackPyrLK
-   --    = function(...)
-   -- 	   local args, pair, points_in, win_size  = toolBox.unpack(
-   -- 	      {...},
-   -- 	      'opencv.TrackPyrLK',
-   -- 	      help.TrackPyrLK,
-   -- 	      {arg='pair', type='table', help='a pair of images (2 WxHx1 tensor)', req=true},
-   -- 	      {arg='points_in',type='torch.Tensor', help='points to track', req=true},
-   -- 	      {arg='win_size',type='number',help='over how large of a window can the LK track', default= 25}
-   -- 	   )
-   -- 	   local points_out = torch.Tensor():resizeAs(points_in):zero()
-   -- 	   local feature_found = torch.Tensor(points_in:size(1)):zero()
-   -- 	   local feature_error = torch.Tensor(points_in:size(1)):zero()
-   -- 	   libopencv.TrackPyrLK(pair[1], pair[2], points_in, points_out, win_size, feature_found, feature_error)
-	   
-   -- 	   return points_out, feature_found, feature_error
-   -- 	end
-
-   -- opencv.drawFlowlinesOnImage
-   --    = function (...)
-   -- 	   local args, pair, image = toolBox.unpack(
-   -- 	      {...},
-   -- 	      'opencv.drawFlowlinesOnImage',
-   -- 	      [[ utility to visualize sparse flows ]],
-   -- 	      {arg='pair', type='table', help='a pair of point tensors (2 nPointsx2 tensor)', req=true},
-   -- 	      {arg='image', type='torch.Tensor',help='image on which to draw the flowlines', req=true},
-   -- 	      {arg='color', type='torch.Tensor',help='color of flow line eg. R = [255,0,0]'},
-   -- 	      {arg='mask', type='torch.Tensor',help='mask tensor 1D npoints 0 when not to draw point'}
-   -- 	   )
-   -- 	   if not color then
-   -- 	      color = torch.Tensor(3):zero()
-   -- 	      color[1] = 255 
-   -- 	   end
-   -- 	   libopencv.drawFlowlinesOnImage(pair[1],pair[2],image,color,mask)
-   -- 	end
-
-   -- opencv.test_TrackPyrLK
-   --    = function()
-   -- 	   local im1 = image.load(paths.concat(paths.install_lua_path, 
-   -- 					       'opticalFlow/img1.jpg'))
-   -- 	   local im2 = image.load(paths.concat(paths.install_lua_path, 
-   -- 					       'opticalFlow/img2.jpg'))
-	   
-   -- 	   local ptsin = opencv.GoodFeaturesToTrack{img=im1,count=im1:nElement()}
-	   
-   -- 	   local ptsout = opencv.TrackPyrLK{pair={im1,im2},points_in=ptsin}
-   -- 	   opencv.drawFlowlinesOnImage({ptsin,ptsout},im2)
-   -- 	   image.displayList{images={im1,im2},
-   -- 			     legends={'previous image',
-   -- 				      'current image w/ flowlines',
-   -- 				      'Optical Flow Pyramidal LK Tracking'},
-   -- 			     legend='opencv: Optical Flow Pyramidal LK Tracking',
-   -- 			     win_w=im1:size(1)*2,win_h=im1:size(2)}
-   -- 	end
 
    -- 	-- Pyramidal Lucas-Kanade
    -- 	opencv.calcOpticalFlowPyrLK

@@ -189,6 +189,25 @@ static THTensor * libopencv_(Main_opencvPoints2torch)(CvPoint2D32f * points, int
   return tensor;
 }
 
+static CvPoint2D32f * libopencv_(Main_torch2opencvPoints)(THTensor *src) {
+
+  int count = src->size[0];
+  // create output
+  CvPoint2D32f * points_cv = 0;
+  points_cv = (CvPoint2D32f*)cvAlloc(count*sizeof(points_cv[0]));
+
+  // copy
+  int p;
+  for (p=0; p<count; p++){
+    points_cv[p].x = (float)THTensor_(get2d)(src, p, 0);
+    points_cv[p].y = (float)THTensor_(get2d)(src, p, 1);
+  }
+
+  // return freshly created IPL image
+  return points_cv;
+}
+
+
 static int libopencv_(Main_testTH2IPL8U)(lua_State *L) {
   THTensor * src  = luaT_checkudata(L, 1, torch_(Tensor_id));  
   THTensor * dst  = luaT_checkudata(L, 2, torch_(Tensor_id));  
@@ -585,218 +604,125 @@ static int libopencv_(Main_cvCalcOpticalFlowPyrLK) (lua_State *L) {
   return 0;
 }
 
-#if 0
 //============================================================
-// To load this lib in LUA:
-// require 'libopencv'
+static int libopencv_(Main_cvTrackPyrLK) (lua_State *L) {
+  // Get Tensor's Info
+  THTensor * image1  = luaT_checkudata(L, 1, torch_(Tensor_id));  
+  THTensor * image2  = luaT_checkudata(L, 2, torch_(Tensor_id));  
+  THTensor * points1 = luaT_checkudata(L, 3, torch_(Tensor_id));  
+  THTensor * points2 = luaT_checkudata(L, 4, torch_(Tensor_id));  
+  THTensor * ff = 0;
+  THTensor * fe = 0;
 
-//============================================================
-// Conversion helpers
-// these functions just create an IPL header to describe 
-// the tensor given (no image allocation is done here)
-//
-static IplImage * libopencv_(Main_doubleImage) (THTensor *source) {
-  // Get size and channels
-  int channels = source->size[2];
-  CvSize size = cvSize(source->size[0], source->size[1]);
-  
-  // Create ipl header
-  IplImage * ipl = cvCreateImageHeader(size, IPL_DEPTH_64F, channels);
+  int count = points1->size[0];
+  int win_size = 10;  
 
-  // Point to tensor data
-  ipl->imageData = (char *)source->storage->data;
-  
-  // in Torch, channels are separate
-  if (channels != 1) ipl->dataOrder = 1;
-
-  return ipl;
-}
-
-static IplImage * libopencv_(Main_floatImage)(THFloatTensor *source) {
-  // Get size and channels
-  int channels = source->size[2];
-  CvSize size = cvSize(source->size[0], source->size[1]);
-  
-  // Create ipl header
-  IplImage * ipl = cvCreateImageHeader(size, IPL_DEPTH_32F, channels);
-
-  // Point to tensor data
-  ipl->imageData = (char *)source->storage->data;
-  
-  // in Torch, channels are separate
-  if (channels != 1) ipl->dataOrder = 1;
-
-  return ipl;
-}
-
-static IplImage * libopencv_(Main_charImage) (THCharTensor *source) {
-  // Get size and channels
-  int channels = source->size[2];
-  CvSize size = cvSize(source->size[0], source->size[1]);
-
-  // Create ipl header
-  IplImage * ipl = cvCreateImageHeader(size, IPL_DEPTH_8U, channels);
-
-  // Point to tensor data
-  ipl->imageData = source->storage->data;
-    
-  // in Torch, channels are separate
-  if (channels != 1) ipl->dataOrder = 1;
-
-  return ipl;
-}
-
-static IplImage * libopencv_(Main_shortImage)(THShortTensor *source) {
-  // Get size and channels
-  int channels = source->size[2];
-  CvSize size = cvSize(source->size[0], source->size[1]);
-
-  // Create ipl header
-  IplImage * ipl = cvCreateImageHeader(size, IPL_DEPTH_16S, channels);
-
-  // Point to tensor data
-  ipl->imageData = (char *)source->storage->data;
-    
-  // in Torch, channels are separate
-  if (channels != 1) ipl->dataOrder = 1;
-
-  return ipl;
-}
-
-//============================================================
-// Conversion helpers
-// These functions create an IplImage, from a torch Tensor, 
-// and the other way around
-//
-static IplImage * libopencv_(Main_torch2opencv_8U)(THTensor *source) {
-  // Pointers
-  uchar * dest_data;
-
-  // Get size and channels
-  int channels = source->size[2];
-  int dest_step;
-  CvSize dest_size = cvSize(source->size[0], source->size[1]);
-
-  // Create ipl image
-  IplImage * dest = cvCreateImage(dest_size, IPL_DEPTH_8U, channels);
-
-  // get pointer to raw data
-  cvGetRawData(dest, (uchar**)&dest_data, &dest_step, &dest_size);
-
-  // copy
-  int x, y, k;
-  // change to a single loop over aligned data
-  for (k=0; y<source->size[1]; y++)
-    for (x=0; x<source->size[0]; x++)
-      for (y=0; k<source->size[2]; k++) {
-        dest_data[ y*dest_step + x*dest->nChannels + (dest->nChannels-1)-k ]
-          = (uchar)(THTensor_get3d(source, x, y, k) * 255.0);
-      }
-
-  // return freshly created IPL image
-  return dest;
-}
-
-static IplImage * libopencv_(Main_torch2opencv_32F)(THTensor *source) {
-  // Pointers
-  float * dest_data;
-
-  // Get size and channels
-  int channels = source->size[2];
-  int dest_step;
-  CvSize dest_size = cvSize(source->size[0], source->size[1]);
-
-  // Create ipl image
-  IplImage * dest = cvCreateImage(dest_size, IPL_DEPTH_32F, channels);
-
-  // get pointer to raw data
-  cvGetRawData(dest, (uchar**)&dest_data, &dest_step, &dest_size);
-  dest_step /= sizeof(float);
-
-  // copy
-  int x, y, k;
-  for (y=0; y<source->size[1]; y++)
-    for (x=0; x<source->size[0]; x++)
-      for (k=0; k<source->size[2]; k++) {
-        dest_data[ y*dest_step + x*dest->nChannels + (dest->nChannels-1)-k ]
-          = (float)(THTensor_get3d(source, x, y, k));
-      }
-
-  // return freshly created IPL image
-  return dest;
-}
-
-static THTensor * libopencv_(Main_opencv2torch_8U)(IplImage *source, THTensor *dest) {
-  // Pointers
-  uchar * source_data; 
-
-  // Get pointers / info
-  int source_step;
-  CvSize source_size;
-  cvGetRawData(source, (uchar**)&source_data, &source_step, &source_size);
-
-  // Resize target
-  THTensor_resize3d(dest, source->width, source->height, source->nChannels);
-
-  // copy
-  int x, y, k;
-  // change to a single for loop
-  for (k=0; y<source->height; y++)
-    for (x=0; x<source->width; x++)
-      for (y=0; k<source->nChannels; k++) {
-        THTensor_set3d(dest, x, y, k, 
-                       (double)source_data[ y*source_step + x*source->nChannels + (source->nChannels-1)-k ]);
-      }
-
-  // return freshly created IPL image
-  return dest;
-}
-
-static THTensor * libopencv_(Main_opencv2torch_32F)(IplImage *source, THTensor *dest) {
-  // Pointers
-  float * source_data; 
-
-  // Get pointers / info
-  int source_step;
-  CvSize source_size;
-  cvGetRawData(source, (uchar**)&source_data, &source_step, &source_size);
-  source_step /= sizeof(float);
-
-  // Resize target
-  THTensor_resize3d(dest, source->width, source->height, source->nChannels);
-
-  // copy
-  int x, y, k;
-  for (y=0; y<source->height; y++)
-    for (x=0; x<source->width; x++)
-      for (k=0; k<source->nChannels; k++) {
-        THTensor_set3d(dest, x, y, k, 
-                       (double)source_data[ y*source_step + x*source->nChannels + (source->nChannels-1)-k ]);
-      }
-
-  // return freshly created IPL image
-  return dest;
-}
-
-
-static CvPoint2D32f * libopencv_(Main_torch_32F2opencvPoints)(THTensor *src) {
-
-  int count = src->size[0];
-  // create output
-  CvPoint2D32f * points_cv = 0;
-  points_cv = (CvPoint2D32f*)cvAlloc(count*sizeof(points_cv[0]));
-
-  // copy
-  int p;
-  for (p=0; p<count; p++){
-    points_cv[p].x = THTensor_get2d(src, p, 0);
-    points_cv[p].y = THTensor_get2d(src, p, 1);
+  // User values:
+  if (lua_isnumber(L, 5)) {
+    win_size = lua_tonumber(L, 5);
   }
 
-  // return freshly created IPL image
-  return points_cv;
+  if (!lua_isnil(L,6)) {
+    ff = luaT_checkudata(L,6,torch_(Tensor_id));  
+    THTensor_(resize1d)(ff,count);
+  }
+  if (!lua_isnil(L,7)) {
+    fe = luaT_checkudata(L,7,torch_(Tensor_id));  
+    THTensor_(resize1d)(fe,count);
+  }
+
+  CvSize dest_size = cvSize(image1->size[2], image1->size[1]);
+  IplImage * image1_ipl = libopencv_(Main_torch2opencv_8U)(image1);
+  IplImage * image2_ipl = libopencv_(Main_torch2opencv_8U)(image2);
+  
+
+  IplImage * grey1 = cvCreateImage( dest_size, 8, 1 );
+  IplImage * grey2 = cvCreateImage( dest_size, 8, 1 );
+
+  cvCvtColor( image1_ipl, grey1, CV_BGR2GRAY );
+  cvCvtColor( image2_ipl, grey2, CV_BGR2GRAY );
+  CvPoint2D32f* points1_cv = libopencv_(Main_torch2opencvPoints)(points1);
+  CvPoint2D32f* points2_cv = 0;
+  points2_cv = (CvPoint2D32f*)cvAlloc(count*sizeof(points2_cv[0]));
+
+
+  // Call Lucas Kanade algorithm
+  char features_found[ count ];
+  float feature_errors[ count ];
+  CvSize pyr_sz = cvSize( image1_ipl->width+8, image1_ipl->height/3 );
+
+  IplImage* pyrA = cvCreateImage( pyr_sz, IPL_DEPTH_32F, 1 );
+  IplImage* pyrB = cvCreateImage( pyr_sz, IPL_DEPTH_32F, 1 );
+  
+  cvCalcOpticalFlowPyrLK( grey1, grey2, 
+			  pyrA, pyrB, 
+			  points1_cv, points2_cv, 
+			  count, 
+			  cvSize( win_size, win_size ), 
+			  5, features_found, feature_errors,
+			  cvTermCriteria( CV_TERMCRIT_ITER | CV_TERMCRIT_EPS, 20, 0.3 ), 0 );
+  
+  // return results
+  libopencv_(Main_opencvPoints2torch)(points2_cv, count, points2);
+  int i;
+  if (ff != 0){
+    for(i=0;i<count;i++){
+      THTensor_(set1d)(ff,i,features_found[i]);
+    }
+  }
+  if (fe != 0){
+    for(i=0;i<count;i++){
+      THTensor_(set1d)(fe,i,feature_errors[i]);
+    }
+  }
+  // Deallocate points_cv
+  cvFree(&points1_cv);
+  cvFree(&points2_cv);
+  cvReleaseImage( &pyrA );
+  cvReleaseImage( &pyrB );
+  cvReleaseImage( &grey1 );
+  cvReleaseImage( &grey2);
+  cvReleaseImage( &image1_ipl );
+  cvReleaseImage( &image2_ipl );
+
+  return 0;
 }
 
+//============================================================
+// draws red flow lines on an image (for visualizing the flow)
+static int libopencv_(Main_cvDrawFlowlinesOnImage) (lua_State *L) {
+  THTensor * points1 = luaT_checkudata(L,1, torch_(Tensor_id));  
+  THTensor * points2 = luaT_checkudata(L,2, torch_(Tensor_id));  
+  THTensor * image   = luaT_checkudata(L,3, torch_(Tensor_id));  
+  THTensor * color   = luaT_checkudata(L,4, torch_(Tensor_id));  
+  THTensor * mask    = 0;
+  int usemask = 0;
+  if (!lua_isnil(L,5)){
+    usemask = 1;
+    mask = luaT_checkudata(L,5, torch_(Tensor_id));
+  }
+  IplImage * image_ipl = libopencv_(Main_torch2opencv_8U)(image);
+  CvScalar color_cv = CV_RGB(THTensor_(get1d)(color,0),
+			     THTensor_(get1d)(color,1),
+			     THTensor_(get1d)(color,2));
+  int count = points1->size[0];
+  int i;
+  for( i = 0; i < count; i++ ) {
+    if ( !usemask || (THTensor_(get1d)(mask,i) > 0)){
+      CvPoint p0 = cvPoint( cvRound( THTensor_(get2d)(points1,i,0)),
+			    cvRound( THTensor_(get2d)(points1,i,1)));
+      CvPoint p1 = cvPoint( cvRound( THTensor_(get2d)(points2,i,0)),
+			    cvRound( THTensor_(get2d)(points2,i,1)));
+      cvLine( image_ipl, p0, p1, color_cv, 2, CV_AA, 0);
+    }
+  }
+  // return results
+  libopencv_(Main_opencv8U2torch)(image_ipl, image);
+  cvReleaseImage( &image_ipl );
+  return 0;
+}
+
+#if 0
 
 //============================================================
 // Wrapper around simple OpenCV functions
@@ -859,182 +785,6 @@ static int libopencv_(Main_cvSobel) (lua_State *L) {
   return 0;
 }
 
-
-
-//============================================================
-static int libopencv_(Main_cvTrackPyrLK) (lua_State *L) {
-  // Get Tensor's Info
-  THTensor * image1  = luaT_checkudata(L, 1, torch_(Tensor_id));  
-  THTensor * image2  = luaT_checkudata(L, 2, torch_(Tensor_id));  
-  THTensor * points1 = luaT_checkudata(L, 3, torch_(Tensor_id));  
-  THTensor * points2 = luaT_checkudata(L, 4, torch_(Tensor_id));  
-  THTensor * ff = 0;
-  THTensor * fe = 0;
-
-  int count = points1->size[0];
-  int win_size = 10;  
-
-  // User values:
-  if (lua_isnumber(L, 5)) {
-    win_size = lua_tonumber(L, 5);
-  }
-
-  if (!lua_isnil(L,6)) {
-    ff = luaT_checkudata(L,6,torch_(Tensor_id));  
-    THTensor_resize1d(ff,count);
-  }
-  if (!lua_isnil(L,7)) {
-    fe = luaT_checkudata(L,7,torch_(Tensor_id));  
-    THTensor_resize1d(fe,count);
-  }
-
-  CvSize dest_size = cvSize(image1->size[0], image1->size[1]);
-  IplImage * image1_ipl = torch2opencv_8U(image1);
-  IplImage * image2_ipl = torch2opencv_8U(image2);
-  
-
-  IplImage * grey1 = cvCreateImage( dest_size, 8, 1 );
-  IplImage * grey2 = cvCreateImage( dest_size, 8, 1 );
-
-  cvCvtColor( image1_ipl, grey1, CV_BGR2GRAY );
-  cvCvtColor( image2_ipl, grey2, CV_BGR2GRAY );
-  CvPoint2D32f* points1_cv = torch_32F2opencvPoints(points1);
-  CvPoint2D32f* points2_cv = 0;
-  points2_cv = (CvPoint2D32f*)cvAlloc(count*sizeof(points2_cv[0]));
-
-
-  // Call Lucas Kanade algorithm
-  char features_found[ count ];
-  float feature_errors[ count ];
-  CvSize pyr_sz = cvSize( image1_ipl->width+8, image1_ipl->height/3 );
-
-  IplImage* pyrA = cvCreateImage( pyr_sz, IPL_DEPTH_32F, 1 );
-  IplImage* pyrB = cvCreateImage( pyr_sz, IPL_DEPTH_32F, 1 );
-  
-  cvCalcOpticalFlowPyrLK( grey1, grey2, 
-			  pyrA, pyrB, 
-			  points1_cv, points2_cv, 
-			  count, 
-			  cvSize( win_size, win_size ), 
-			  5, features_found, feature_errors,
-			  cvTermCriteria( CV_TERMCRIT_ITER | CV_TERMCRIT_EPS, 20, 0.3 ), 0 );
-  
-  // return results
-  opencvPoints2torch_32F(points2_cv, count, points2);
-  int i;
-  if (ff != 0){
-    for(i=0;i<count;i++){
-      THTensor_set1d(ff,i,features_found[i]);
-    }
-  }
-  if (fe != 0){
-    for(i=0;i<count;i++){
-      THTensor_set1d(fe,i,feature_errors[i]);
-    }
-  }
-  // Deallocate points_cv
-  cvFree(&points1_cv);
-  cvFree(&points2_cv);
-  cvReleaseImage( &pyrA );
-  cvReleaseImage( &pyrB );
-  cvReleaseImage( &grey1 );
-  cvReleaseImage( &grey2);
-  cvReleaseImage( &image1_ipl );
-  cvReleaseImage( &image2_ipl );
-
-  return 0;
-}
-
-
-//============================================================
-// draws red flow lines on an image (for visualizing the flow)
-static int libopencv_(Main_cvDrawFlowlinesOnImage) (lua_State *L) {
-  THTensor * points1 = luaT_checkudata(L,1, torch_(Tensor_id));  
-  THTensor * points2 = luaT_checkudata(L,2, torch_(Tensor_id));  
-  THTensor * image   = luaT_checkudata(L,3, torch_(Tensor_id));  
-  THTensor * color   = luaT_checkudata(L,4, torch_(Tensor_id));  
-  THTensor * mask    = 0;
-  int usemask = 0;
-  if (!lua_isnil(L,5)){
-    usemask = 1;
-    mask = luaT_checkudata(L,5, torch_(Tensor_id));
-  }
-  IplImage * image_ipl = torch2opencv_8U(image);
-  CvScalar color_cv = CV_RGB(THTensor_get1d(color,0),
-			     THTensor_get1d(color,1),
-			     THTensor_get1d(color,2));
-  int count = points1->size[0];
-  int i;
-  for( i = 0; i < count; i++ ) {
-    if ( !usemask || (THTensor_get1d(mask,i) > 0)){
-      CvPoint p0 = cvPoint( cvRound( THTensor_get2d(points1,i,0)),
-			    cvRound( THTensor_get2d(points1,i,1)));
-      CvPoint p1 = cvPoint( cvRound( THTensor_get2d(points2,i,0)),
-			    cvRound( THTensor_get2d(points2,i,1)));
-      cvLine( image_ipl, p0, p1, color_cv, 2, CV_AA, 0);
-    }
-  }
-  // return results
-  opencv2torch_8U(image_ipl, image);
-  cvReleaseImage( &image_ipl );
-  return 0;
-}
-
-
-
-//============================================================
-// Other converters
-// a bit redundant now, these two functions swap from RGB
-// to BGR
-//
-IplImage * libopencv_(Main_torchRGBtoOpenCVBGR)(IplImage * source) {
-  uchar * source_data; 
-  uchar * dest_data;
-  int source_step, dest_step;
-  CvSize source_size, dest_size;
-  
-  // create destination image
-  IplImage * dest = cvCreateImage(cvSize(source->width, source->height),
-                                  IPL_DEPTH_8U, source->nChannels);
-
-  // get pointer to raw data
-  cvGetRawData(source, (uchar**)&source_data, &source_step, &source_size);
-  cvGetRawData(dest, (uchar**)&dest_data, &dest_step, &dest_size);
-
-  // copy
-  int x, y, k;
-  for (y=0; y<source->height; y++)
-    for (x=0; x<source->width; x++)
-      for (k=0; k<source->nChannels; k++) {
-        dest_data[ y*dest_step + x*dest->nChannels + 2-k ]
-          = source_data[ k*source->width*source->height + y*source->width + x ];
-      }
-  
-  return dest;
-}
-
-void libopencv_(Main_openCVBGRtoTorchRGB)(IplImage * source, IplImage * dest) {
-  uchar * source_data; 
-  double * dest_data;
-  int source_step, dest_step;
-  CvSize source_size, dest_size;
-
-  // get pointer to raw data
-  cvGetRawData(source, (uchar**)&source_data, &source_step, &source_size);
-  cvGetRawData(dest, (uchar**)&dest_data, &dest_step, &dest_size);
-
-  // copy
-  int x, y, k;
-  for (y=0; y<source->height; y++)
-    for (x=0; x<source->width; x++)
-      for (k=0; k<source->nChannels; k++) {
-        dest_data[ k*dest->width*dest->height + y*dest->width + x ]
-          = (double)source_data[ y*source_step + x*source->nChannels + 2-k ] / 255.0;
-      }
-
-  // set this flag
-  dest->dataOrder = 1;
-}
 
 //============================================================
 // HaarDetectObjects
@@ -1179,8 +929,8 @@ static const luaL_reg libopencv_(Main__) [] =
   /* {"captureFromCam",       libopencv_(Main_cvCaptureFromCAM)}, */
   /* {"releaseCam",           libopencv_(Main_cvReleaseCAM)}, */
   /* {"haarDetectObjects",    libopencv_(Main_cvHaarDetectObjects)}, */
-  /* {"drawFlowlinesOnImage", libopencv_(Main_cvDrawFlowlinesOnImage)}, */
-  /* {"TrackPyrLK",           libopencv_(Main_cvTrackPyrLK)}, */
+  {"drawFlowlinesOnImage", libopencv_(Main_cvDrawFlowlinesOnImage)},
+  {"TrackPyrLK",           libopencv_(Main_cvTrackPyrLK)},
   {"CalcOpticalFlowPyrLK",  libopencv_(Main_cvCalcOpticalFlowPyrLK)},
   {"CalcOpticalFlow",       libopencv_(Main_cvCalcOpticalFlow)},
   {"CornerHarris",          libopencv_(Main_cvCornerHarris)},
