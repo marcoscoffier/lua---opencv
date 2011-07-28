@@ -293,6 +293,31 @@ function opencv.GoodFeaturesToTrack_testme(img)
 		 legend='opencv: GoodFeaturesToTrack'}
 end
 
+
+opencv.CalcOpticalFlowPyrLK
+   = function(...)
+	local args, image_from, image_to = 
+	   xlua.unpack(
+	   {...},
+	   'opencv.CalcOpticalFlowPyrLK',
+	   [[
+		 Computes the Pyramidal Lucas-Kanade optical flow algorithm of opencv.
+   		    + input two images
+   		    + returns a points tensor of the sub-pixel positions of the features 
+		    and a copy of the input image with red lines indicating the flow from the interest points ]], 
+	   {arg='image_from', type='torch.Tensor', help='image in which calculate from flow',req=true},
+	   {arg='image_to',   type='torch.Tensor', help='image in which calculate to flow',req=true}
+	)
+
+   -- need to clean this up can be internal to C function
+   local flowx = torch.Tensor(image_from:size(1),image_from:size(2)):zero()
+   local flowy = torch.Tensor(image_from:size(1),image_from:size(2)):zero()
+   local points = torch.Tensor(500,2)
+   local image_out = torch.Tensor():resizeAs(image_to):copy(image_to)
+   image_from.libopencv.CalcOpticalFlowPyrLK(image_from,image_to,flowx,flowy,points,image_out)
+   return points, image_out
+end
+
 function opencv.CalcOpticalFlowPyrLK_testme(imgL,imgR)
    if not imgL then
       imgL = opencv.imgL()
@@ -300,11 +325,7 @@ function opencv.CalcOpticalFlowPyrLK_testme(imgL,imgR)
    if not imgR then
       imgR = opencv.imgR()
    end
-   local flowx = torch.Tensor(imgL:size(1),imgL:size(2)):zero()
-   local flowy = torch.Tensor(imgL:size(1),imgL:size(2)):zero()
-   local points = torch.Tensor(500,2)
-   local image_out = torch.Tensor():resizeAs(imgR):copy(imgR)
-   imgL.libopencv.CalcOpticalFlowPyrLK(imgL,imgR,flowx,flowy,points,image_out)
+   local points, image_out = opencv.CalcOpticalFlowPyrLK(imgL,imgR)
    image.display(image_out)
 end
 
