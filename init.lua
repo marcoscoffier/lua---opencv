@@ -302,12 +302,16 @@ opencv.CalcOpticalFlowPyrLK
 	   {...},
 	   'opencv.CalcOpticalFlowPyrLK',
 	   [[
-		 Computes the Pyramidal Lucas-Kanade optical flow algorithm of opencv.
-   		    + input two images
-   		    + returns a points tensor of the sub-pixel positions of the features 
-		    and a copy of the input image with red lines indicating the flow from the interest points ]], 
-	   {arg='image_from', type='torch.Tensor', help='image in which calculate from flow',req=true},
-	   {arg='image_to',   type='torch.Tensor', help='image in which calculate to flow',req=true}
+Computes the Pyramidal Lucas-Kanade optical flow algorithm of opencv.
+  + input two images
+  + returns a points tensor of the sub-pixel positions of the features 
+and a copy of the input image with red lines indicating the flow from 
+the interest points 
+           ]], 
+	   {arg='image_from', type='torch.Tensor', 
+	    help='image in which calculate from flow',req=true},
+	   {arg='image_to', type='torch.Tensor', 
+	    help='image in which calculate to flow',req=true}
 	)
 
    -- need to clean this up can be internal to C function
@@ -380,12 +384,14 @@ opencv.TrackPyrLK
 	local args, pair, points_in, win_size  = xlua.unpack(
 	   {...},
 	   'opencv.TrackPyrLK',
-	   [[
-		 Runs pyramidal Lucas-Kanade, on two input images and a set of points
-		 which are meant to be tracked ]],
-	   {arg='pair', type='table', help='a pair of images (2 WxHx1 tensor)', req=true},
-	   {arg='points_in',type='torch.Tensor', help='points to track', req=true},
-	   {arg='win_size',type='number',help='over how large of a window can the LK track', default= 25}
+	   [[Runs pyramidal Lucas-Kanade, on two input images and a set of 
+points which are meant to be tracked ]],
+	   {arg='pair', type='table', 
+	    help='a pair of images (2 WxHx1 tensor)', req=true},
+	   {arg='points_in',type='torch.Tensor', 
+	    help='points to track', req=true},
+	   {arg='win_size',type='number',
+	    help='over how large of a window can the LK track', default= 25}
 	)
 	local points_out = torch.Tensor():resizeAs(points_in):zero()
 	local feature_found = torch.Tensor(points_in:size(1)):zero()
@@ -401,10 +407,14 @@ opencv.drawFlowlinesOnImage
 	   {...},
 	   'opencv.drawFlowlinesOnImage',
 	   [[ utility to visualize sparse flows ]],
-	   {arg='pair', type='table', help='a pair of point tensors (2 nPointsx2 tensor)', req=true},
-	   {arg='image', type='torch.Tensor',help='image on which to draw the flowlines', req=true},
-	   {arg='color', type='torch.Tensor',help='color of flow line eg. R = [255,0,0]'},
-	   {arg='mask', type='torch.Tensor',help='mask tensor 1D npoints 0 when not to draw point'}
+	   {arg='pair', type='table', 
+	    help='a pair of point tensors (2 nPointsx2 tensor)', req=true},
+	   {arg='image', type='torch.Tensor',
+	    help='image on which to draw the flowlines', req=true},
+	   {arg='color', type='torch.Tensor',
+	    help='color of flow line eg. R = [255,0,0]'},
+	   {arg='mask', type='torch.Tensor',
+	    help='mask tensor 1D npoints 0 when not to draw point'}
 	)
 	if not color then
 	   color = torch.Tensor(3):zero()
@@ -442,74 +452,3 @@ function opencv.testme()
    opencv.GoodFeaturesToTrack(imgL)
    opencv.TrackPyrLK_testme(imgL,imgR)
 end
-
-
-   -- 	-- Pyramidal Lucas-Kanade
-   -- 	opencv.calcOpticalFlowPyrLK
-   -- 	   = function(...)
-   -- 		local args, pair, count  = toolBox.unpack(
-   -- 		   {...},
-   -- 		   'opencv.calcOpticalFlowPyrLK',
-   -- 		   help.calcOpticalFlowPyrLK,
-   -- 		   {arg='pair', type='table', help='a pair of images (2 WxHx1 tensor)', req=true},
-   -- 		   {arg='count',type='number', help='number of points on which to calculate', default=500}
-   -- 		)
-   -- 		local img_out = torch.Tensor():resizeAs(pair[2]):copy(pair[2])
-   -- 		local points = torch.Tensor(count,2)
-   -- 		local quality = 0.01
-   -- 		local min_distance = 5
-   -- 		local win_size = 25
-   -- 		local flow_x = 
-   -- 		   torch.Tensor(pair[1]:size(1),pair[1]:size(2),1):zero()
-   -- 		local flow_y = 
-   -- 		   torch.Tensor(pair[1]:size(1),pair[1]:size(2),1):zero()
-   -- 		local image_out = 
-   -- 		   libopencv.calcOpticalFlowPyrLK(pair[1], pair[2],
-   -- 						  flow_x:select(3,1), flow_y:select(3,1),
-   -- 						  points, img_out,
-   -- 						  count, quality,
-   -- 						  min_distance, win_size)
-   -- 		local flow_norm = torch.Tensor()
-   -- 		local flow_angle = torch.Tensor()
-   -- 		-- compute norm:
-   -- 		local x_squared = torch.Tensor():resizeAs(flow_x):copy(flow_x):cmul(flow_x)
-   -- 		flow_norm:resizeAs(flow_y):copy(flow_y):cmul(flow_y):add(x_squared):sqrt()
-   -- 		-- compute angle:
-   -- 		flow_angle:resizeAs(flow_y):copy(flow_y):cdiv(flow_x):abs():atan():mul(180/math.pi)
-   -- 		flow_angle:map2(flow_x, flow_y, function(h,x,y)
-   -- 						   if x == 0 and y >= 0 then
-   -- 						      return 90
-   -- 						   elseif x == 0 and y <= 0 then
-   -- 						      return 270
-   -- 						   elseif x >= 0 and y >= 0 then
-   -- 						      -- all good
-   -- 						   elseif x >= 0 and y < 0 then
-   -- 						      return 360 - h
-   -- 						   elseif x < 0 and y >= 0 then
-   -- 						      return 180 - h
-   -- 						   elseif x < 0 and y < 0 then
-   -- 						      return 180 + h
-   -- 						   end
-   -- 						end)
-
-   -- 		return flow_norm, flow_angle, flow_x, flow_y, points, img_out
-   -- 	     end
-
-   -- 	-- testers:
-   -- 	opencv.test_calcOpticalFlowPyrLK
-   -- 	   = function()
-   -- 		local im1 = image.load(paths.concat(paths.install_lua_path, 
-   -- 						    'opticalFlow/img1.jpg'))
-   -- 		local im2 = image.load(paths.concat(paths.install_lua_path, 
-   -- 						    'opticalFlow/img2.jpg'))
-		
-   -- 		local n,a,x,y,pts,iout = 
-   -- 		   opencv.calcOpticalFlowPyrLK{pair={im1,im2},
-   -- 					       count=im1:size(1)*im1:size(2)} 
-   -- 		image.displayList{images={im1,iout},
-   -- 				  legends={'original image',
-   -- 					   'Optical Flow Pyramidal LK'},
-   -- 				  legend='opencv: Optical Flow Pyramidal LK',
-   -- 				  win_w=im1:size(1)*2,win_h=im1:size(2)}
-   -- 	     end                     
-	

@@ -7,16 +7,18 @@ source = {
 }
 
 description = {
-   summary = "Wrapper for some highlevel opencv function",
+   summary = "Wrapper for some highlevel opencv functions",
    detailed = [[
       For now, it contains wrappers for:
-       + cvCalcOpticalFlowBM
-       + cvCalcOpticalFlowHS
-       + cvCalcOpticalFlowLK
-       + cvHaarDetectObjects
-       + cvCaptureFromCAM
-       + cvSobel
-       + cvCanny
+
+ + opencv.CornerHarris() [lua] --> cvCornerHarris [C/C++]
+
+ + opencv.CalcOpticalFlow() [lua] -->
+   - cvCalcOpticalFlowBM [C/C++]
+   - cvCalcOpticalFlowHS [C/C++]
+   - cvCalcOpticalFlowLK [C/C++]
+
+ + opencv.CalcOpticalFlowPyrLK [lua] --> cvCalcOpticalFlowPyrLK [C/C++]
    ]],
    homepage = "",
    license = "MIT/X11" -- or whatever you like
@@ -50,8 +52,6 @@ build = {
 	 MESSAGE(STATUS "OpenCV include dirs: ${OpenCV_INCLUDE_DIRS}")
    	 INCLUDE_DIRECTORIES (${TORCH_INCLUDE_DIR} ${PROJECT_SOURCE_DIR} ${OpenCV_INCLUDE_DIRS})
    	 add_library(opencv SHARED opencv.c)
-	 MESSAGE(STATUS "TORCH_LIBRARY_DIR: ${TORCH_LIBRARY_DIR}")
-	 MESSAGE(STATUS "TORCH_LIBRARIES: ${TORCH_LIBRARIES}")
 
 	 link_directories (${TORCH_LIBRARY_DIR})
 	 target_link_libraries(opencv ${TORCH_LIBRARIES} ${OpenCV_LIBS})
