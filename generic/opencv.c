@@ -216,14 +216,6 @@ static int libopencv_(Main_testTH2IPL8U)(lua_State *L) {
 
   libopencv_(Main_opencv8U2torch)(ipl, dst);
   real *dst_data = THTensor_(data)(dst);
-  /*
-  printf("src (%f,%f,%f) ", src_data[0],src_data[1],src_data[2]);
-  printf("ipl (%f,%f,%f)", 
-	 ((uchar)ipl->imageData[2])/255.0,
-	 ((uchar)ipl->imageData[2+3])/255.0,
-	 ((uchar)ipl->imageData[2+6])/255.0);
-  printf("dst(%f,%f,%f)\n", dst_data[0],dst_data[1],dst_data[2]);
-  */
   cvReleaseImage(&ipl);
   return 0;
 }
@@ -235,14 +227,6 @@ static int libopencv_(Main_testTH2IPL32F)(lua_State *L) {
 
   libopencv_(Main_opencv32F2torch)(ipl, dst);
   real *dst_data = THTensor_(data)(dst);
-  /*
-  printf("src (%f,%f,%f) ", src_data[0],src_data[1],src_data[2]);
-  printf("ipl (%f,%f,%f)", 
-	 ((uchar)ipl->imageData[2])/255.0,
-	 ((uchar)ipl->imageData[2+3])/255.0,
-	 ((uchar)ipl->imageData[2+6])/255.0);
-  printf("dst(%f,%f,%f)\n", dst_data[0],dst_data[1],dst_data[2]);
-  */
   cvReleaseImage(&ipl);
   return 0;
 }
