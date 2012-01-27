@@ -33,6 +33,10 @@
 #include <signal.h>
 #include <pthread.h>
 
+#include <cv.h>
+#include <highgui.h>
+
+#define CV_NO_BACKWARD_COMPATIBILITY
 
 static THTensor * libopencv_(Main_opencv8U2torch)(IplImage *source, THTensor *dest) {
   // Pointers
@@ -709,34 +713,106 @@ static int libopencv_(Main_cvDrawFlowlinesOnImage) (lua_State *L) {
  *  -- return dense field
  */
 static int libopencv_(Main_smoothVoronoi) (lua_State *L) {
-  THTensor * points1 = luaT_checkudata(L,1, torch_(Tensor_id));  
-  THTensor * data    = luaT_checkudata(L,2, torch_(Tensor_id));  
-  THTensor * output   = luaT_checkudata(L,3, torch_(Tensor_id));
-
+  THTensor * points = luaT_checkudata(L,1, torch_(Tensor_id));  
+  THTensor * data   = luaT_checkudata(L,2, torch_(Tensor_id));  
+  THTensor * output = luaT_checkudata(L,3, torch_(Tensor_id));
+  real * output_pt[8];
+  real * data_pt;
+  int i,j;
+  output_pt[0] = THTensor_(data)(output);
+  data_pt = THTensor_(data)(data);
+  
+  for (i=1;i<output->size[0];i++){
+    output_pt[i] = output_pt[0] + i*output->stride[0];
+  }
   CvRect rect = { 0, 0, 100+output->size[2], 100+output->size[1] };
-  printf("rect: (%d,%d,%d,%d)\n",
-         rect.x,rect.y,rect.width,rect.height);
   CvMemStorage* storage;
   CvSubdiv2D* subdiv;
 
-  storage = cvCreateMemStorage(0);
+  storage = cvCreateMemStorage(points->size[0]*sizeof(CvSubdiv2DPoint));
   subdiv = cvCreateSubdiv2D( CV_SEQ_KIND_SUBDIV2D, sizeof(*subdiv),
                              sizeof(CvSubdiv2DPoint),
                              sizeof(CvQuadEdge2D),
                              storage );
   cvInitSubdivDelaunay2D( subdiv, rect );
 
-  int count = points1->size[0];
-  int i;
+  int count = points->size[0];
   for( i = 0; i < count; i++ ) {
-    CvPoint2D32f fp = cvPoint2D32f((double)THTensor_(get2d)(points1,i,0),
-                                   (double)THTensor_(get2d)(points1,i,1));
-    printf("[%d] (%f, %f)\n",i,fp.x,fp.y);
-    cvSubdivDelaunay2DInsert( subdiv, fp );
+    CvPoint2D32f fp = cvPoint2D32f((double)THTensor_(get2d)(points,i,0),
+                                   (double)THTensor_(get2d)(points,i,1));
+    CvSubdiv2DPoint * e = cvSubdivDelaunay2DInsert( subdiv, fp );
+    e->flags = i; /* store the index of the point */
   }
+
+  
   cvCalcSubdivVoronoi2D( subdiv );
 
-  // now do smoothing
+  /*
+   * now loop through the image and for each point find the triangle
+   * of points around it and interpolate
+   */
+  int x,y;
+  CvPoint2D32f fp;
+  CvSubdiv2DEdge e = 0; 
+  CvSubdiv2DEdge e0 = 0;
+  CvSubdiv2DPoint* p = NULL;
+  CvSubdiv2DPoint* org = NULL;
+  CvSubdiv2DPoint* dst = NULL;
+  real data_w[3][8];
+  real data_x[3];
+  real data_y[3];
+      
+  for (y=0;y<output->size[1];y++){
+    for (x=0;x<output->size[2];x++){
+      fp = cvPoint2D32f((double)x, (double)y);
+      count = 0;
+      /* find first point on a triangle around this point */
+      cvSubdiv2DLocate( subdiv, fp, &e0, &p );
+      if( e0 ) {
+        e = e0;
+        do // Always 3 edges -- this is a triangulation, after all.
+          {
+            // Do something with e ...
+            e   = cvSubdiv2DGetEdge(e,CV_NEXT_AROUND_LEFT);
+            org = cvSubdiv2DEdgeOrg(e);
+            dst = cvSubdiv2DEdgeDst(e);
+            data_x[count] = org->pt.x;
+            data_y[count] = org->pt.y;
+            for(i=0;i<data->size[1];i++){
+              data_w[count][i] = THTensor_(get2d)(data,org->flags,i);
+            }
+            count++;
+          }
+        while( e != e0 );
+        /* interpolate weights from 3 points */
+        /* determinant of the original position matrix */
+        real DET =
+          data_x[0]*data_y[1] -
+          data_x[1]*data_y[0] +
+          data_x[1]*data_y[2] -
+          data_x[2]*data_y[1] +
+          data_x[2]*data_y[0] -
+          data_x[0]*data_y[2];
+        real A,B,C,w;
+        
+        for (i=0;i<output->size[0];i++){
+          A = ((data_y[1]-data_y[2])*data_w[0][i] +
+               (data_y[2]-data_y[0])*data_w[1][i] +
+               (data_y[0]-data_y[1])*data_w[2][i]) / DET ;
+          B = ((data_x[2]-data_x[1])*data_w[0][i] +
+               (data_x[0]-data_x[2])*data_w[1][i] +
+               (data_x[1]-data_x[0])*data_w[2][i]) / DET ;
+          C = ((data_x[1]*data_y[2]-data_x[2]*data_y[1])*data_w[0][i] +
+               (data_x[2]*data_y[0]-data_x[0]*data_y[2])*data_w[1][i] +
+               (data_x[0]*data_y[1]-data_x[1]*data_y[0])*data_w[2][i]) /
+            DET ;
+          THTensor_(set3d)(output,i,y,x,A*x+B*y+C);
+        }
+        //printf("  count: %d\n",count);
+        count = 0;
+      }
+    } 
+  } 
   cvReleaseMemStorage( &storage );
 
   return 0;

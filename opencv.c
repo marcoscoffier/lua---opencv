@@ -2,11 +2,6 @@
 #include <TH.h>
 #include <luaT.h>
 
-#include <cv.h>
-#include <highgui.h>
-
-#define CV_NO_BACKWARD_COMPATIBILITY
-
 #define torch_(NAME) TH_CONCAT_3(torch_, Real, NAME)
 #define torch_string_(NAME) TH_CONCAT_STRING_3(torch., Real, NAME)
 #define libopencv_(NAME) TH_CONCAT_3(libopencv_, Real, NAME)

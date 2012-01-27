@@ -461,8 +461,9 @@ opencv.smoothVoronoi
 	   local height = points:select(2,2):max()
            output = torch.Tensor(data:size(2),height,width)
 	end
-        print(output:size())
+        sys.tic()
         data.libopencv.smoothVoronoi(points,data,output)
+        print("time to compute dense flow: ",sys.toc())
 	return output
      end
 
