@@ -403,7 +403,7 @@ points which are meant to be tracked ]],
 
 opencv.drawFlowlinesOnImage
    = function (...)
-	local args, pair, image = xlua.unpack(
+	local args, pair, image, color, mask = xlua.unpack(
 	   {...},
 	   'opencv.drawFlowlinesOnImage',
 	   [[ utility to visualize sparse flows ]],
@@ -441,6 +441,42 @@ function opencv.TrackPyrLK_testme(imgL,imgR)
 			  'Optical Flow Pyramidal LK Tracking'},
 		 legend='opencv: Optical Flow Pyramidal LK Tracking',
 		 win_w=imgL:size(1)*2,win_h=imgL:size(2)}
+end
+
+opencv.smoothVoronoi
+   = function (...)
+	local args, points, data, output = xlua.unpack(
+	   {...},
+	   'opencv.smoothVoronoi',
+	   [[ dense interpolation of sparse flows ]],
+	   {arg='points', type='torch.Tensor', 
+	    help='nPoints x 2 tensor -- locations', req=true},
+	   {arg='data', type='torch.Tensor', 
+	    help='nPoints x n tensor -- data', req=true},
+	   {arg='output', type='torch.Tensor',
+	    help='bounding rectangle in which dense flows will be stored'}
+	)
+	if not output then
+	   local width  = points:select(2,1):max() 
+	   local height = points:select(2,2):max()
+           output = torch.Tensor(data:size(2),height,width)
+	end
+        print(output:size())
+        data.libopencv.smoothVoronoi(points,data,output)
+	return output
+     end
+
+function opencv.smoothVoronoi_testme(imgL,imgR)
+   if not imgL then
+      imgL = opencv.imgL()
+   end
+   if not imgR then
+      imgR = opencv.imgR()
+   end
+   ptsin = opencv.GoodFeaturesToTrack{image=imgL,count=imgL:nElement()} 
+   ptsout = opencv.TrackPyrLK{pair={imgL,imgR},points_in=ptsin}
+   output = opencv.smoothVoronoi(ptsout,ptsout-ptsin)
+   image.display{image={output:select(1,1),output:select(1,2)}}
 end
 
 function opencv.testme()

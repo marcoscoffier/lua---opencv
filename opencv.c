@@ -2,12 +2,18 @@
 #include <TH.h>
 #include <luaT.h>
 
+#include <cv.h>
+#include <highgui.h>
+
+#define CV_NO_BACKWARD_COMPATIBILITY
+
 #define torch_(NAME) TH_CONCAT_3(torch_, Real, NAME)
 #define torch_string_(NAME) TH_CONCAT_STRING_3(torch., Real, NAME)
 #define libopencv_(NAME) TH_CONCAT_3(libopencv_, Real, NAME)
 
 static const void* torch_FloatTensor_id = NULL;
 static const void* torch_DoubleTensor_id = NULL;
+
 
 #include "generic/opencv.c"
 #include "THGenerateFloatTypes.h"

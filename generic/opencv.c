@@ -2,7 +2,7 @@
 #define TH_GENERIC_FILE "generic/opencv.c"
 #else
 
-//===========================================================================
+//======================================================================
 // File: opencv
 //
 // Description: A wrapper for a couple of OpenCV functions.
@@ -13,7 +13,8 @@
 //  http://www.samontab.com/web/2010/04/installing-opencv-2-1-in-ubuntu/
 //
 // Author: Clement Farabet // clement.farabet@gmail.com
-//===========================================================================
+//         Marco Scoffier // github@metm.org (more functions)
+//======================================================================
 
 #include <luaT.h>
 #include <TH.h>
@@ -32,10 +33,6 @@
 #include <signal.h>
 #include <pthread.h>
 
-#include <cv.h>
-#include <highgui.h>
-
-#define CV_NO_BACKWARD_COMPATIBILITY
 
 static THTensor * libopencv_(Main_opencv8U2torch)(IplImage *source, THTensor *dest) {
   // Pointers
@@ -193,7 +190,7 @@ static CvPoint2D32f * libopencv_(Main_torch2opencvPoints)(THTensor *src) {
 
   int count = src->size[0];
   // create output
-  CvPoint2D32f * points_cv = 0;
+  CvPoint2D32f * points_cv = NULL;
   points_cv = (CvPoint2D32f*)cvAlloc(count*sizeof(points_cv[0]));
 
   // copy
@@ -679,7 +676,7 @@ static int libopencv_(Main_cvDrawFlowlinesOnImage) (lua_State *L) {
   THTensor * points2 = luaT_checkudata(L,2, torch_(Tensor_id));  
   THTensor * image   = luaT_checkudata(L,3, torch_(Tensor_id));  
   THTensor * color   = luaT_checkudata(L,4, torch_(Tensor_id));  
-  THTensor * mask    = 0;
+  THTensor * mask    = NULL;
   int usemask = 0;
   if (!lua_isnil(L,5)){
     usemask = 1;
@@ -705,222 +702,59 @@ static int libopencv_(Main_cvDrawFlowlinesOnImage) (lua_State *L) {
   cvReleaseImage( &image_ipl );
   return 0;
 }
+/*
+ * to create a smooth flow map from the dense tracking:
+ *  -- compute voronoi tessalation around sparse input points
+ *  -- interpolate to fill each triangle
+ *  -- return dense field
+ */
+static int libopencv_(Main_smoothVoronoi) (lua_State *L) {
+  THTensor * points1 = luaT_checkudata(L,1, torch_(Tensor_id));  
+  THTensor * data    = luaT_checkudata(L,2, torch_(Tensor_id));  
+  THTensor * output   = luaT_checkudata(L,3, torch_(Tensor_id));
 
-#if 0
+  CvRect rect = { 0, 0, 100+output->size[2], 100+output->size[1] };
+  printf("rect: (%d,%d,%d,%d)\n",
+         rect.x,rect.y,rect.width,rect.height);
+  CvMemStorage* storage;
+  CvSubdiv2D* subdiv;
 
-//============================================================
-// Wrapper around simple OpenCV functions
-// All these functions work on the Lua stack
-// Input and output tensors must be provided, usually in the
-// correct format (char/float/double...)
-//
-static int libopencv_(Main_cvCanny) (lua_State *L) {
-  // Get Tensor's Info
-  THCharTensor * source = luaT_checkudata(L, 1, torch_(Tensor_id));  
-  THCharTensor * dest   = luaT_checkudata(L, 2, torch_(Tensor_id));  
+  storage = cvCreateMemStorage(0);
+  subdiv = cvCreateSubdiv2D( CV_SEQ_KIND_SUBDIV2D, sizeof(*subdiv),
+                             sizeof(CvSubdiv2DPoint),
+                             sizeof(CvQuadEdge2D),
+                             storage );
+  cvInitSubdivDelaunay2D( subdiv, rect );
 
-  // Generate IPL headers
-  IplImage * source_ipl = charImage(source);
-  IplImage * dest_ipl   = charImage(dest);
-
-  // Thresholds with default values
-  double low_threshold = 0;
-  double high_threshold = 1;
-  int aperture_size = 3;
-  if (lua_isnumber(L, 3)) low_threshold = lua_tonumber(L, 3);
-  if (lua_isnumber(L, 4)) high_threshold = lua_tonumber(L, 4);
-  if (lua_isnumber(L, 5)) aperture_size = lua_tonumber(L, 5);
-
-  // Simple call to CV function
-  cvCanny(source_ipl, dest_ipl, low_threshold, high_threshold, aperture_size );
-  cvScale(dest_ipl, dest_ipl, 0.25, 0);
-
-  // Deallocate headers
-  cvReleaseImageHeader(&source_ipl);
-  cvReleaseImageHeader(&dest_ipl);
-
-  return 0;
-}
-
-static int libopencv_(Main_cvSobel) (lua_State *L) {
-  // Get Tensor's Info
-  THCharTensor * source = luaT_checkudata(L, 1, torch_(Tensor_id));  
-  THShortTensor * dest  = luaT_checkudata(L, 2, torch_(Tensor_id));  
-
-  // Generate IPL headers
-  IplImage * source_ipl = charImage(source);
-  IplImage * dest_ipl   = shortImage(dest);
-
-  // Thresholds with default values
-  int dx = 0;
-  int dy = 1;
-  int aperture_size = 3;
-  if (lua_isnumber(L, 3)) dx = lua_tonumber(L, 3);
-  if (lua_isnumber(L, 4)) dy = lua_tonumber(L, 4);
-  if (lua_isnumber(L, 5)) aperture_size = lua_tonumber(L, 5);
-
-  // Simple call to CV function
-  cvSobel(source_ipl, dest_ipl, dx, dy, aperture_size);
-
-  // Deallocate headers
-  cvReleaseImageHeader(&source_ipl);
-  cvReleaseImageHeader(&dest_ipl);
-
-  return 0;
-}
-
-
-//============================================================
-// HaarDetectObjects
-// Simple object detector based on haar features
-//
-static int libopencv_(Main_cvHaarDetectObjects) (lua_State *L) {
-  // Generate IPL header from tensor
-  THCharTensor * input = luaT_checkudata(L, 1, torch_(Tensor_id));
-  IplImage * image = charImage(input);
-
-  // Invert channels 
-  IplImage * image_interleaved = torchRGBtoOpenCVBGR(image);
-
-  // Get cascade path
-  const char * path_to_cascade = luaL_checkstring(L, 2);;
-  CvHaarClassifierCascade * cascade 
-    = (CvHaarClassifierCascade *) cvLoad(path_to_cascade, 0, 0, 0);
-  if (cascade == NULL) {
-    perror("file doesnt exist, exiting");
-    lua_pushnil(L);
-    return 1;
+  int count = points1->size[0];
+  int i;
+  for( i = 0; i < count; i++ ) {
+    CvPoint2D32f fp = cvPoint2D32f((double)THTensor_(get2d)(points1,i,0),
+                                   (double)THTensor_(get2d)(points1,i,1));
+    printf("[%d] (%f, %f)\n",i,fp.x,fp.y);
+    cvSubdivDelaunay2DInsert( subdiv, fp );
   }
+  cvCalcSubdivVoronoi2D( subdiv );
 
-  /* if the flag is specified, down-scale the input image to get a
-     performance boost w/o loosing quality (perhaps) */
-  int i, scale = 1;
-  IplImage* small_image = image_interleaved;
-  int do_pyramids = 1;
-  if( do_pyramids ) {
-    small_image = cvCreateImage( cvSize(image_interleaved->width/2,image_interleaved->height/2),
-                                 IPL_DEPTH_8U, 3 );
-    cvPyrDown( image_interleaved, small_image, CV_GAUSSIAN_5x5 );
-    scale = 2;
-  }
-
-  /* use the fastest variant */
-  CvSeq* faces;
-  CvMemStorage* storage = cvCreateMemStorage(0);
-#if (CV_MINOR_VERSION >= 2)
-  faces = cvHaarDetectObjects( small_image, cascade, storage, 1.2, 3, 0,
-                               cvSize(30,30), cvSize(small_image->width,small_image->height) );
-#else
-  faces = cvHaarDetectObjects( small_image, cascade, storage, 1.2, 3, 0, cvSize(30,30));
-#endif
-  return 0;
-
-  /* extract all the rectangles, and add them on the stack */
-  lua_newtable(L);
-  for( i = 0; i < faces->total; i++ ) {
-    /* extract the rectanlges only */
-    CvRect face_rect = *(CvRect*)cvGetSeqElem( faces, i );
-    
-    printf("face at (%d,%d)-(%d,%d)", 
-           face_rect.x*scale,
-           face_rect.y*scale,
-           face_rect.x*scale + face_rect.width*scale,
-           face_rect.y*scale + face_rect.height*scale );
-    
-    // and push result on the stack
-    lua_pushnumber(L,i*4+1);
-    lua_pushnumber(L,face_rect.x*scale);
-    lua_settable(L,-3);
-    lua_pushnumber(L,i*4+2);
-    lua_pushnumber(L,face_rect.y*scale);
-    lua_settable(L,-3);
-    lua_pushnumber(L,i*4+3);
-    lua_pushnumber(L,face_rect.width*scale);
-    lua_settable(L,-3);
-    lua_pushnumber(L,i*4+4);
-    lua_pushnumber(L,face_rect.height*scale);
-    lua_settable(L,-3);
-  }
-  
-  // Cleanup
-  if( small_image != image_interleaved ) cvReleaseImage( &small_image );
+  // now do smoothing
   cvReleaseMemStorage( &storage );
-  cvReleaseHaarClassifierCascade( &cascade );
-  cvReleaseImageHeader( &image );
-  cvReleaseImage( &image_interleaved );
 
-  return 1; // the table contains the results
-}
-
-//============================================================
-// CaptureFromCAM
-// wrapper around the Cv camera interface
-//
-static CvCapture *libopencv_(Main_camera) = 0;
-static int libopencv_(Main_cvCaptureFromCAM) (lua_State *L) {
-  // Get Tensor's Info
-  THTensor * image = luaT_checkudata(L, 1, torch_(Tensor_id));  
-
-  // idx
-  int camidx = 0;
-  if (lua_isnumber(L, 2)) camidx = lua_tonumber(L, 2);
-
-  // get camera
-  if( libopencv_(Main_camera) == 0 ) {
-    printf("opencv: starting capture on device %d\n", camidx);
-    libopencv_(Main_camera) = cvCaptureFromCAM(camidx);
-    if (!libopencv_(Main_camera)) perror("Could not initialize capturing...\n");
-  }
-
-  // grab frame
-  IplImage *frame = NULL;
-  frame = cvQueryFrame(libopencv_(Main_camera));
-  if (!frame) perror("Could not get frame...\n");
-
-  // resize given tensor
-  if (image->size[1]!=frame->width 
-      || image->size[2]!=frame->height || image->size[3]!=3) {
-     THTensor_resize3d(image,frame->width,frame->height,3);
-  }
-
-  // Generate IPL headers
-  IplImage * curr_image = doubleImage(image);
-
-  // copy this frame to torch format
-  openCVBGRtoTorchRGB(frame, curr_image);
-
-  // Deallocate headers
-  cvReleaseImageHeader(&curr_image);
-  
   return 0;
 }
-
-static int libopencv_(Main_cvReleaseCAM) (lua_State *L) {
-  cvReleaseCapture( &libopencv_(Main_camera) );
-  return 0;
-}
-
-#endif // 0
-
 //============================================================
 // Register functions in LUA
 //
 static const luaL_reg libopencv_(Main__) [] = 
 {
-  /* {"canny",                libopencv_(Main_cvCanny)}, */
-  /* {"sobel",                libopencv_(Main_cvSobel)}, */
-  //  {"HoG", libopencv_(Main_cvhog},
-  /* {"captureFromCam",       libopencv_(Main_cvCaptureFromCAM)}, */
-  /* {"releaseCam",           libopencv_(Main_cvReleaseCAM)}, */
-  /* {"haarDetectObjects",    libopencv_(Main_cvHaarDetectObjects)}, */
+  {"smoothVoronoi",        libopencv_(Main_smoothVoronoi)},
   {"drawFlowlinesOnImage", libopencv_(Main_cvDrawFlowlinesOnImage)},
   {"TrackPyrLK",           libopencv_(Main_cvTrackPyrLK)},
-  {"CalcOpticalFlowPyrLK",  libopencv_(Main_cvCalcOpticalFlowPyrLK)},
-  {"CalcOpticalFlow",       libopencv_(Main_cvCalcOpticalFlow)},
-  {"CornerHarris",          libopencv_(Main_cvCornerHarris)},
-  {"GoodFeaturesToTrack",   libopencv_(Main_cvGoodFeaturesToTrack)},
-  {"test_torch2IPL32F",     libopencv_(Main_testTH2IPL32F)},
-  {"test_torch2IPL8U",      libopencv_(Main_testTH2IPL8U)},
+  {"CalcOpticalFlowPyrLK", libopencv_(Main_cvCalcOpticalFlowPyrLK)},
+  {"CalcOpticalFlow",      libopencv_(Main_cvCalcOpticalFlow)},
+  {"CornerHarris",         libopencv_(Main_cvCornerHarris)},
+  {"GoodFeaturesToTrack",  libopencv_(Main_cvGoodFeaturesToTrack)},
+  {"test_torch2IPL32F",    libopencv_(Main_testTH2IPL32F)},
+  {"test_torch2IPL8U",     libopencv_(Main_testTH2IPL8U)},
   {NULL, NULL}  /* sentinel */
 };
 
