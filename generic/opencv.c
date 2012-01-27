@@ -38,7 +38,7 @@
 
 #define CV_NO_BACKWARD_COMPATIBILITY
 
-static THTensor * libopencv_(Main_opencv8U2torch)(IplImage *source, THTensor *dest) {
+static void libopencv_(Main_opencv8U2torch)(IplImage *source, THTensor *dest) {
   // Pointers
   uchar * source_data; 
 
@@ -67,12 +67,12 @@ static THTensor * libopencv_(Main_opencv8U2torch)(IplImage *source, THTensor *de
 		    );
     THTensor_(free)(tslice);
   }
+
+  // cleanup
   THTensor_(free)(tensor);
-  // return freshly created torch tensor
-  return tensor;
 }
 
-static THTensor * libopencv_(Main_opencv32F2torch)(IplImage *source, THTensor *dest) {
+static void libopencv_(Main_opencv32F2torch)(IplImage *source, THTensor *dest) {
   // Pointers
   float * source_data; 
 
@@ -101,9 +101,9 @@ static THTensor * libopencv_(Main_opencv32F2torch)(IplImage *source, THTensor *d
 		    );
     THTensor_(free)(tslice);
   }
+
+  // cleanup
   THTensor_(free)(tensor);
-  // return freshly created torch tensor
-    return tensor;
 }
 
 static IplImage * libopencv_(Main_torch2opencv_8U)(THTensor *source) {
@@ -185,7 +185,7 @@ static IplImage * libopencv_(Main_torch2opencv_32F)(THTensor *source) {
   return dest;
 }
 
-static THTensor * libopencv_(Main_opencvPoints2torch)(CvPoint2D32f * points, int npoints, THTensor *tensor) {
+static void libopencv_(Main_opencvPoints2torch)(CvPoint2D32f * points, int npoints, THTensor *tensor) {
 
   // Resize target
   THTensor_(resize2d)(tensor, npoints, 2);
@@ -198,10 +198,9 @@ static THTensor * libopencv_(Main_opencvPoints2torch)(CvPoint2D32f * points, int
     *tensor_data++ = (real)points[p].x;
     *tensor_data++ = (real)points[p].y;
   }
-  THTensor_(free)(tensorc);
 
-  // return freshly created IPL image
-  return tensor;
+  // cleanup
+  THTensor_(free)(tensorc);
 }
 
 static CvPoint2D32f * libopencv_(Main_torch2opencvPoints)(THTensor *src) {
