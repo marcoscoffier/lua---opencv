@@ -65,7 +65,9 @@ static THTensor * libopencv_(Main_opencv8U2torch)(IplImage *source, THTensor *de
 		    // step through channels of ipl
 		    sourcep = sourcep + source->nChannels; 
 		    );
+    THTensor_(free)(tslice);
   }
+  THTensor_(free)(tensor);
   // return freshly created torch tensor
   return tensor;
 }
@@ -97,7 +99,9 @@ static THTensor * libopencv_(Main_opencv32F2torch)(IplImage *source, THTensor *d
 		    // step through ipl
 		    sourcep = sourcep + source->nChannels; 
 		    );
+    THTensor_(free)(tslice);
   }
+  THTensor_(free)(tensor);
   // return freshly created torch tensor
     return tensor;
 }
@@ -116,8 +120,10 @@ static IplImage * libopencv_(Main_torch2opencv_8U)(THTensor *source) {
 
   // get pointer to raw data
   cvGetRawData(dest, (uchar**)&dest_data, &dest_step, &dest_size);
+
   // copy
   THTensor *tensor = THTensor_(newContiguous)(source);
+
   // Torch stores channels first, opencv last so we select the channel
   // in torch tensor and step through the opencv iplimage.
   int i = 0,j = 0;
@@ -133,7 +139,12 @@ static IplImage * libopencv_(Main_torch2opencv_8U)(THTensor *source) {
 		    // step through ipl
 		    destp = destp + dest->nChannels; 
 		    );
+    THTensor_(free)(tslice);
   }
+
+  // free
+  THTensor_(free)(tensor);
+
   // return freshly created IPL image
   return dest;
 }
@@ -167,7 +178,9 @@ static IplImage * libopencv_(Main_torch2opencv_32F)(THTensor *source) {
 		    *destp = (float)(*tslice_data);
 		    destp = destp + dest->nChannels; // step through ipl
 		    );
+    THTensor_(free)(tslice);
   }
+  THTensor_(free)(tensor);
   // return freshly created IPL image
   return dest;
 }
@@ -185,6 +198,7 @@ static THTensor * libopencv_(Main_opencvPoints2torch)(CvPoint2D32f * points, int
     *tensor_data++ = (real)points[p].x;
     *tensor_data++ = (real)points[p].y;
   }
+  THTensor_(free)(tensorc);
 
   // return freshly created IPL image
   return tensor;
@@ -402,11 +416,9 @@ static int libopencv_(Main_cvGoodFeaturesToTrack) (lua_State *L) {
   // Get Tensor's Info
   THTensor * image     = luaT_checkudata(L, 1, torch_(Tensor_id));  
   THTensor * points    = luaT_checkudata(L, 2, torch_(Tensor_id));  
-  THTensor * image_out = luaT_checkudata(L, 3, torch_(Tensor_id));  
   
   CvSize dest_size         = cvSize(image->size[2], image->size[1]);
   IplImage * image_ipl     = libopencv_(Main_torch2opencv_8U)(image);
-  IplImage * image_out_ipl = libopencv_(Main_torch2opencv_8U)(image_out);
 
   IplImage * grey = cvCreateImage( dest_size, 8, 1 );
 
@@ -422,17 +434,17 @@ static int libopencv_(Main_cvGoodFeaturesToTrack) (lua_State *L) {
   int win_size = 10;  
 
   // User values:
+  if (lua_isnumber(L, 3)) {
+    count = lua_tonumber(L, 3);
+  }
   if (lua_isnumber(L, 4)) {
-    count = lua_tonumber(L, 4);
+    quality = lua_tonumber(L, 4);
   }
   if (lua_isnumber(L, 5)) {
-    quality = lua_tonumber(L, 5);
+    min_distance = lua_tonumber(L, 5);
   }
   if (lua_isnumber(L, 6)) {
-    min_distance = lua_tonumber(L, 6);
-  }
-  if (lua_isnumber(L, 7)) {
-    win_size = lua_tonumber(L, 7);
+    win_size = lua_tonumber(L, 6);
   }
 
   points_cv = (CvPoint2D32f*)cvAlloc(count*sizeof(points_cv[0]));
@@ -440,30 +452,15 @@ static int libopencv_(Main_cvGoodFeaturesToTrack) (lua_State *L) {
   cvGoodFeaturesToTrack( grey, eig, temp, points_cv, &count,
 			 quality, min_distance, 0, 3, 0, 0.04 );
   
-  /*
-    // this function is Seq Faulting (not sure why...)
-  cvFindCornerSubPix( grey, points_cv, count,
-  		      cvSize(win_size,win_size),
-  		      cvSize(-1,-1),
-  		      cvTermCriteria(CV_TERMCRIT_ITER|CV_TERMCRIT_EPS,
-  				     20,0.03));
-  */
-  int i = 0;
-  for( i = 0; i < count; i++ ) {
-    cvCircle( image_out_ipl, cvPointFrom32f(points_cv[i]), 25, 
-	      CV_RGB(0,255,0), 1, 8,0);
-  }
   // return results
-  points = libopencv_(Main_opencvPoints2torch)(points_cv, count, points);
-  libopencv_(Main_opencv8U2torch)(image_out_ipl, image_out);
-
+  libopencv_(Main_opencvPoints2torch)(points_cv, count, points);
+  
   // Deallocate points_cv
   cvFree(&points_cv);
   cvReleaseImage( &eig );
   cvReleaseImage( &temp );
   cvReleaseImage( &grey );
   cvReleaseImage( &image_ipl );
-  cvReleaseImage( &image_out_ipl );
 
   return 0;
 }

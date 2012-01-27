@@ -260,7 +260,6 @@ opencv.GoodFeaturesToTrack
 	   'opencv.GoodFeaturesToTrack',
 	   [[
 		 Computes the GoodFeatures algorithm of opencv.
-   		    + input img in which to find features 
    		    + returns a points tensor of the sub-pixel positions of the features 
 		    and a copy of the input image with yellow circles around the interest points ]], 
 	   {arg='image', type='torch.Tensor', help='image in which to detect Good Feature points',req=true},
@@ -270,16 +269,14 @@ opencv.GoodFeaturesToTrack
 	   {arg='win_size',type='number', help='window size over which to run heuristics', default=10}
 	)
 	local img = image
-	local img_out = torch.Tensor():resizeAs(img):copy(img)
 	local points = torch.Tensor(2,count)
-	local image_out = img.libopencv.GoodFeaturesToTrack(img,
-							points,
-							img_out,
-							count,
-							quality,
-							min_distance,
-							win_size)
-	return points, img_out
+	img.libopencv.GoodFeaturesToTrack(img,
+                  							points,
+                  							count,
+                  							quality,
+                  							min_distance,
+                  							win_size)
+	return points
      end
 
 -- testers:
