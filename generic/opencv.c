@@ -709,7 +709,7 @@ static int libopencv_(Main_cvDrawFlowlinesOnImage) (lua_State *L) {
  *  -- return dense field
  */
 static int libopencv_(Main_smoothVoronoi) (lua_State *L) {
-  THTensor * points = luaT_checkudata(L,1, torch_(Tensor_id));  
+  THTensor * points = luaT_checkudata(L,1, torch_(Tensor_id));
   THTensor * data   = luaT_checkudata(L,2, torch_(Tensor_id));  
   THTensor * output = luaT_checkudata(L,3, torch_(Tensor_id));
   real * output_pt[8];
@@ -721,7 +721,12 @@ static int libopencv_(Main_smoothVoronoi) (lua_State *L) {
   for (i=1;i<output->size[0];i++){
     output_pt[i] = output_pt[0] + i*output->stride[0];
   }
-  CvRect rect = { 0, 0, 100+output->size[2], 100+output->size[1] };
+  /* annoying set this higher if you get errors about points being out
+     of range */
+  int ex = 100;
+  int w = 2 * ex + output->size[2];
+  int h = 2 * ex + output->size[1];
+  CvRect rect = { -ex, -ex, w ,h };
   CvMemStorage* storage;
   CvSubdiv2D* subdiv;
 
@@ -737,7 +742,7 @@ static int libopencv_(Main_smoothVoronoi) (lua_State *L) {
     CvPoint2D32f fp = cvPoint2D32f((double)THTensor_(get2d)(points,i,0),
                                    (double)THTensor_(get2d)(points,i,1));
     CvSubdiv2DPoint * e = cvSubdivDelaunay2DInsert( subdiv, fp );
-    e->flags = i; /* store the index of the point */
+    e->flags = i; /* store the index of the point */ 
   }
 
   
@@ -773,9 +778,10 @@ static int libopencv_(Main_smoothVoronoi) (lua_State *L) {
             org = cvSubdiv2DEdgeOrg(e);
             dst = cvSubdiv2DEdgeDst(e);
             data_x[count] = org->pt.x;
-            data_y[count] = org->pt.y;
+            data_y[count] = org->pt.y; 
             for(i=0;i<data->size[1];i++){
               data_w[count][i] = THTensor_(get2d)(data,org->flags,i);
+              //data_w[count][i] = (data_pt + (org->flags*data->stride[1] + i))[0];
             }
             count++;
           }
