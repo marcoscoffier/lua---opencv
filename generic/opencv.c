@@ -723,7 +723,7 @@ static int libopencv_(Main_smoothVoronoi) (lua_State *L) {
   }
   /* annoying set this higher if you get errors about points being out
      of range */
-  int ex = 100;
+  int ex = 1000;
   int w = 2 * ex + output->size[2];
   int h = 2 * ex + output->size[1];
   CvRect rect = { -ex, -ex, w ,h };
