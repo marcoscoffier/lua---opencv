@@ -8,4 +8,4 @@ SET(src opencv.c)
 SET(luasrc init.lua img1.jpg img2.jpg)
 
 ADD_TORCH_PACKAGE(opencv "${src}" "${luasrc}" "Image Processing")
-TARGET_LINK_LIBRARIES(opencv luaT TH)
+TARGET_LINK_LIBRARIES(opencv luaT TH ${OpenCV_LIBS})
