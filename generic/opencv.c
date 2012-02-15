@@ -819,11 +819,70 @@ static int libopencv_(Main_smoothVoronoi) (lua_State *L) {
 
   return 0;
 }
+
+//============================================================
+static int libopencv_(Main_cvCanny) (lua_State *L) {
+  // Get Tensor's Info
+  THTensor * source = luaT_checkudata(L, 1, torch_(Tensor_id));
+  THTensor * dest   = luaT_checkudata(L, 2, torch_(Tensor_id));
+
+  // Generate IPL headers
+  IplImage * source_ipl = libopencv_(Main_torch2opencv_8U)(source);
+  IplImage * dest_ipl = cvCreateImage(cvGetSize(source_ipl), IPL_DEPTH_8U,
+                                      source_ipl->nChannels);
+
+  // Thresholds with default values
+  double low_threshold = 0;
+  double high_threshold = 1;
+  int aperture_size = 3;
+  if (lua_isnumber(L, 3)) low_threshold = lua_tonumber(L, 3);
+  if (lua_isnumber(L, 4)) high_threshold = lua_tonumber(L, 4);
+  if (lua_isnumber(L, 5)) aperture_size = lua_tonumber(L, 5);
+
+  // Simple call to CV function
+  cvCanny(source_ipl, dest_ipl, low_threshold, high_threshold, aperture_size);
+
+  // return results
+  libopencv_(Main_opencv8U2torch)(dest_ipl, dest);
+
+  // Deallocate headers
+  cvReleaseImageHeader(&source_ipl);
+  cvReleaseImageHeader(&dest_ipl);
+
+  return 0;
+}
+
+//============================================================
+static int libopencv_(Main_cvEqualizeHist) (lua_State *L) {
+  // Get Tensor's Info
+  THTensor * source = luaT_checkudata(L, 1, torch_(Tensor_id));
+  THTensor * dest   = luaT_checkudata(L, 2, torch_(Tensor_id));
+
+  // Generate IPL headers
+  IplImage * source_ipl = libopencv_(Main_torch2opencv_8U)(source);
+  IplImage * dest_ipl = cvCreateImage(cvGetSize(source_ipl), IPL_DEPTH_8U,
+                                      source_ipl->nChannels);
+
+
+  // Simple call to CV function
+  cvEqualizeHist(source_ipl, dest_ipl);
+
+  // return results
+  libopencv_(Main_opencv8U2torch)(dest_ipl, dest);
+
+  // Deallocate headers
+  cvReleaseImageHeader(&source_ipl);
+  cvReleaseImageHeader(&dest_ipl);
+
+  return 0;
+}
 //============================================================
 // Register functions in LUA
 //
 static const luaL_reg libopencv_(Main__) [] = 
 {
+  {"EqualizeHist",         libopencv_(Main_cvEqualizeHist)},
+  {"Canny",                libopencv_(Main_cvCanny)},
   {"smoothVoronoi",        libopencv_(Main_smoothVoronoi)},
   {"drawFlowlinesOnImage", libopencv_(Main_cvDrawFlowlinesOnImage)},
   {"TrackPyrLK",           libopencv_(Main_cvTrackPyrLK)},

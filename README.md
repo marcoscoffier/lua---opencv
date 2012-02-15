@@ -4,14 +4,16 @@
 
 ## currently wrapped packages
 
- + opencv.CornerHarris() [lua] --> cvCornerHarris [C/C++]
+ + opencv.EqualizeHist() [lua]          --> cvEqualizeHist [C/C++]
+ + opencv.Canny() [lua]                 --> cvCanny [C/C++]
+ + opencv.CornerHarris() [lua]          --> cvCornerHarris [C/C++]
 
- + opencv.CalcOpticalFlow() [lua] -->
+ + opencv.CalcOpticalFlow() [lua]       -->
    - cvCalcOpticalFlowBM [C/C++]
    - cvCalcOpticalFlowHS [C/C++]
    - cvCalcOpticalFlowLK [C/C++]
 
- + opencv.CalcOpticalFlowPyrLK [lua] --> cvCalcOpticalFlowPyrLK [C/C++]
+ + opencv.CalcOpticalFlowPyrLK [lua]    --> cvCalcOpticalFlowPyrLK [C/C++]
 
 ## who
 

@@ -27,6 +27,58 @@ opencv = {}
 require 'libopencv'
 
 
+-- Canny
+function opencv.Canny(...)
+   local _, source, low_threshold, high_threshold, aperturesize = xlua.unpack(
+      {...},
+      'opencv.Canny',
+      'Implements the Canny algorithm for edge detection.',
+      {arg='source', type='torch.Tensor',
+       help='image in which to perform edge detection', req=true},
+      {arg='low_threshold',type='number',
+       help='The smallest value between low_threshold and high_threshold is used for edge linking, the largest value is used to find the initial segments of strong edges.', default=0},
+      {arg='high_threshold',type='number',
+       help='cf. low_threshold',default=1},
+      {arg='aperturesize',type='number',
+       help='Sobel aperture size', default=3}
+   )
+   local img = source
+   if source:size(1) == 3 then
+      print('WARNING: opencv.Canny converting image to grey')
+      img=image.rgb2y(source)
+   elseif source:size(1) ~= 1 then
+      xerror(' *** ERROR: opencv.Canny works only on RBG or grey img')
+   end
+   if aperturesize % 2 == 0 or aperturesize > 7 then
+      print('WARNING: aperturesize (Sobel kernel size) must be odd and not larger than 7')
+      aperturesize = math.min(aperturesize -1,7)
+   end
+   local dest = torch.Tensor():resizeAs(img)
+   img.libopencv.Canny(img,dest,low_threshold,high_threshold,aperturesize)
+   return dest
+end
+
+-- EqualizeHist
+function opencv.EqualizeHist(...)
+   local _, source = xlua.unpack(
+      {...},
+      'opencv.EqualizeHist',
+      'Implements the Histogram Equalization algorithm.',
+      {arg='source', type='torch.Tensor',
+       help='image in which to perform Histogram Equalization', req=true}
+   )
+   local img = source
+   if source:size(1) == 3 then
+      print('WARNING: opencv.EqualizeHist converting image to grey')
+      img=image.rgb2y(source)
+   elseif source:size(1) ~= 1 then
+      xerror(' *** ERROR: opencv.EqualizeHist works only on RBG or grey img')
+   end
+   local dest = torch.Tensor():resizeAs(img)
+   img.libopencv.EqualizeHist(img,dest)
+   return dest
+end
+
 -- CornerHarris
 function opencv.CornerHarris(...)
    local _, img, blocksize, aperturesize, k = xlua.unpack(
