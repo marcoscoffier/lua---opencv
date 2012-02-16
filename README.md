@@ -4,6 +4,10 @@
 
 ## currently wrapped packages
 
+ + opencv.GetAffineTransform() [lua]    --> cvGetAffineTransform [C/C++]
+ + opencv.WarpAffine() [lua]            --> cvWarpAffine [C/C++]
+ + opencv.EqualizeHist() [lua]          --> cvEqualizeHist [C/C++]
+ + opencv.Canny() [lua]                 --> cvCanny [C/C++]
  + opencv.EqualizeHist() [lua]          --> cvEqualizeHist [C/C++]
  + opencv.Canny() [lua]                 --> cvCanny [C/C++]
  + opencv.CornerHarris() [lua]          --> cvCornerHarris [C/C++]

@@ -1,21 +1,25 @@
--- 
+--
 -- Note: this bit of code is a simple wrapper around the OpenCV library
 --       http://opencv.willowgarage.com/
 --
 -- For now, it contains wrappers for:
+--  + opencv.GetAffineTransform() [lua]    --> cvGetAffineTransform [C/C++]
+--  + opencv.WarpAffine() [lua]            --> cvWarpAffine [C/C++]
+--  + opencv.EqualizeHist() [lua]          --> cvEqualizeHist [C/C++]
+--  + opencv.Canny() [lua]                 --> cvCanny [C/C++]
 --  + opencv.CornerHarris() [lua] --> cvCornerHarris [C/C++]
 --
 --  + opencv.CalcOpticalFlow() [lua] -->
---    - cvCalcOpticalFlowBM 
+--    - cvCalcOpticalFlowBM
 --    - cvCalcOpticalFlowHS
 --    - cvCalcOpticalFlowLK
 --
 --  + opencv.GoodFeaturesToTrack() [lua] --> cvGoodFeaturesToTrack [C/C++]
--- 
+--
 -- Wrapper: Clement Farabet.
 -- Additional functions: GoodFeatures...(),PLK,etc.: Marco Scoffier
 -- Adapted for torch7: Marco Scoffier
--- 
+--
 
 require 'torch'
 require 'xlua'
@@ -36,7 +40,9 @@ function opencv.Canny(...)
       {arg='source', type='torch.Tensor',
        help='image in which to perform edge detection', req=true},
       {arg='low_threshold',type='number',
-       help='The smallest value between low_threshold and high_threshold is used for edge linking, the largest value is used to find the initial segments of strong edges.', default=0},
+       help=[[The smallest value between low_threshold and high_threshold is used
+             for edge linking, the largest value is used to find the initial segments
+             of strong edges.]], default=0},
       {arg='high_threshold',type='number',
        help='cf. low_threshold',default=1},
       {arg='aperturesize',type='number',
@@ -57,6 +63,96 @@ function opencv.Canny(...)
    img.libopencv.Canny(img,dest,low_threshold,high_threshold,aperturesize)
    return dest
 end
+
+
+function opencv.GetAffineTransform(...)
+   local args,  points_src, points_dst  = xlua.unpack(
+      {...},
+      'opencv.GetAffineTransform',
+      [[Calculates the affine transform from 3 corresponding points. ]],
+      {arg='points_src',type='torch.Tensor',
+       help='source points', req=true},
+      {arg='points_dst',type='torch.Tensor',
+       help='destination points', req=true}
+   )
+   local warp = torch.Tensor()
+   warp.libopencv.GetAffineTransform(points_src,points_dst,warp)
+   return warp
+end
+
+-- test function:
+function opencv.GetAffineTransform_testme()
+   src = torch.Tensor(3,2)
+   dst = torch.Tensor(3,2)
+   src[1][1]=0
+   src[1][2]=0
+   src[2][1]=511
+   src[2][2]=0
+   src[3][1]=0
+   src[3][2]=511
+
+   dst[1][1]=0
+   dst[1][2]=512*0.25
+   dst[2][1]=512*0.9
+   dst[2][2]=512*0.15
+   dst[3][1]=512*0.1
+   dst[3][2]=512*0.75
+
+   warp = opencv.GetAffineTransform(src,dst)
+   print('Warp matrix:')
+   print(warp)
+end
+
+-- WarpAffine
+function opencv.WarpAffine(...)
+   local _, source,warp = xlua.unpack(
+      {...},
+      'opencv.WarpAffine',
+      [[Implements the affine transform which allows the user to warp,
+            stretch, rotate and resize an image.]],
+      {arg='source', type='torch.Tensor',
+       help='image in which to perform Histogram Equalization', req=true},
+      {arg='warp', type='torch.Tensor',
+       help='2x3 transformation matrix', req=true}
+   )
+   local img = source
+   if warp:size(1) ~= 2 or warp:size(2) ~= 3 then
+      xerror(' *** ERROR: opencv.WarpAffine warp Tensor must be 2x3')
+   end
+   local dest = torch.Tensor():resizeAs(img)
+   img.libopencv.WarpAffine(img,dest,warp)
+   return dest
+end
+
+-- test function:
+function opencv.WarpAffine_testme(img)
+   if not img then
+      img = image.lena()
+      image.display{image=img,legend='Original image'}
+   end
+
+   local src = torch.Tensor(3,2)
+   local dst = torch.Tensor(3,2)
+   src[1][1]=0
+   src[1][2]=0
+   src[2][1]=511
+   src[2][2]=0
+   src[3][1]=0
+   src[3][2]=511
+
+   dst[1][1]=0
+   dst[1][2]=512*0.15
+   dst[2][1]=512*0.9
+   dst[2][2]=512*0.05
+   dst[3][1]=512*0.1
+   dst[3][2]=512*0.75
+
+   local warp = opencv.GetAffineTransform(src,dst)
+   print('warp',warp)
+   local warpImg = opencv.WarpAffine(img,warp)
+   image.display{image=warpImg,legend='Warped image'}
+end
+
 
 -- EqualizeHist
 function opencv.EqualizeHist(...)
@@ -85,16 +181,16 @@ function opencv.CornerHarris(...)
       {...},
       'opencv.CornerHarris',
       'Computes the Harris Corner features of an image the input image will be converted to a WxHx1 tensor',
-      {arg='img', type='torch.Tensor', 
+      {arg='img', type='torch.Tensor',
        help='image in which to detect Haar points', req=true},
-      {arg='blocksize',type='number', 
+      {arg='blocksize',type='number',
        help='neighborhood size', default=9},
       {arg='aperturesize',type='number',
        help='Sobel aperture size', default=3},
       {arg='k',type='number',
        help='the Harris detector free parameter',default=0.04}
    )
-   
+
    local img = img
    if img:size(1) > 1 then
       print('WARNING: computing harris corners on first feature')
@@ -102,7 +198,7 @@ function opencv.CornerHarris(...)
    end
    if aperturesize % 2 == 0 then
       print('WARNING: aperturesize (Sobel kernel size) must be odd and not larger than 31')
-      aperturesize = aperturesize -1 
+      aperturesize = aperturesize -1
    end
    local harris = torch.Tensor():resizeAs(img)
    img.libopencv.CornerHarris(img,harris,blocksize,aperturesize,k)
@@ -136,46 +232,46 @@ function opencv.CalcOpticalFlow(...)
    lagrangian, iterations, autoscale,
    raw, reuse, flow_x, flow_y = xlua.unpack(
       {...},
-      'opencv.CalcOpticalFlow', 
+      'opencv.CalcOpticalFlow',
       [[
-  Computes the optical flow of a pair of images, and returns 4 maps: 
-  the flow field intensities, the flow field directions, and 
+  Computes the optical flow of a pair of images, and returns 4 maps:
+  the flow field intensities, the flow field directions, and
   the raw X and Y components
 
-  The flow field is computed using one of 3 methods: 
+  The flow field is computed using one of 3 methods:
     Block Matching (BM), Lucas-Kanade (LK) or Horn-Schunck (HS).
 
   The input images must be a pair of WxHx1 tensors.
       ]],
-      {arg='pair', type='table', 
+      {arg='pair', type='table',
        help='a pair of images (2 WxHx1 tensor)', req=true},
-      {arg='method', type='string', 
+      {arg='method', type='string',
        help='method used: BM | HS | LK', default='BM'},
-      {arg='block_w', type='number', 
+      {arg='block_w', type='number',
        help='matching block width (BM+LK)', default=9},
-      {arg='block_h', type='number', 
+      {arg='block_h', type='number',
        help='matching block height (BM+LK)', default=9},
-      {arg='shift_x', type='number', 
+      {arg='shift_x', type='number',
        help='shift step in x (BM only)', default=4},
-      {arg='shift_y', type='number', 
+      {arg='shift_y', type='number',
        help='shift step in y (BM only)', default=4},
-      {arg='window_w', type='number', 
+      {arg='window_w', type='number',
        help='matching window width (BM only)', default=30},
-      {arg='window_h', type='number', 
+      {arg='window_h', type='number',
        help='matching window height (BM only)', default=30},
-      {arg='lagrangian', type='number', 
+      {arg='lagrangian', type='number',
        help='lagrangian multiplier (HS only)', default=1},
-      {arg='iterations', type='number', 
+      {arg='iterations', type='number',
        help='nb of iterations (HS only)', default=5},
-      {arg='autoscale', type='boolean', 
+      {arg='autoscale', type='boolean',
        help='auto resize results', default=true},
-      {arg='raw', type='boolean', 
+      {arg='raw', type='boolean',
        help='if set, returns the raw X,Y fields', default=false},
-      {arg='reuse', type='boolean', 
+      {arg='reuse', type='boolean',
        help='reuse last flow computed (HS+BM)', default=false},
-      {arg='flow_x', type='torch.Tensor', 
+      {arg='flow_x', type='torch.Tensor',
        help='existing (previous) X-field (WxHx1 tensor)'},
-      {arg='flow_y', type='torch.Tensor', 
+      {arg='flow_y', type='torch.Tensor',
        help='existing (previous) Y-field (WxHx1 tensor)'}
    )
 
@@ -237,7 +333,7 @@ function opencv.CalcOpticalFlow(...)
       flow_norm:resizeAs(flow_y):copy(flow_y):cmul(flow_y):add(x_squared):sqrt()
       -- compute angle:
       flow_angle:resizeAs(flow_y):copy(flow_y):cdiv(flow_x):abs():atan():mul(180/math.pi)
-      flow_angle:map2(flow_x, flow_y, 
+      flow_angle:map2(flow_x, flow_y,
 		      function(h,x,y)
 			 if x == 0 and y >= 0 then
 			    return 90
@@ -286,7 +382,7 @@ function opencv.CalcOpticalFlow_testme(img1, img2)
    local methods = {'LK', 'HS', 'BM'}
    for i,method in ipairs(methods) do
       print(i,method)
-      local norm, angle, flow_x, flow_y = 
+      local norm, angle, flow_x, flow_y =
 	 opencv.CalcOpticalFlow{pair={img1,img2}, method=method}
       local hsl = torch.Tensor(3,img1:size(2), img1:size(3))
       hsl:select(1,1):copy(angle):div(360)
@@ -300,20 +396,20 @@ function opencv.CalcOpticalFlow_testme(img1, img2)
                     scaleeach=true,
 		    legend='cvOpticalFLow, method = ' .. method,
 		    legends={'norm','angle', 'flow x', 'flow y'}}
-   end                     
+   end
 end
 
 -- GoodFeaturesToTrack
 opencv.GoodFeaturesToTrack
    = function(...)
-	local args, image, count, quality, min_distance, win_size  = 
+	local args, image, count, quality, min_distance, win_size  =
 	   xlua.unpack(
 	   {...},
 	   'opencv.GoodFeaturesToTrack',
 	   [[
 		 Computes the GoodFeatures algorithm of opencv.
-   		    + returns a points tensor of the sub-pixel positions of the features 
-		    and a copy of the input image with yellow circles around the interest points ]], 
+   		    + returns a points tensor of the sub-pixel positions of the features
+		    and a copy of the input image with yellow circles around the interest points ]],
 	   {arg='image', type='torch.Tensor', help='image in which to detect Good Feature points',req=true},
 	   {arg='count',type='number', help='number of points to return', default=500},
 	   {arg='quality',type='number', help='quality', default=0.01},
@@ -337,7 +433,7 @@ function opencv.GoodFeaturesToTrack_testme(img)
       img = opencv.imgL()
    end
    local pts, iout = opencv.GoodFeaturesToTrack{image=img,count=125}
-   
+
    image.display{image=iout,
 		 legends={'Good Features'},
 		 legend='opencv: GoodFeaturesToTrack'}
@@ -346,20 +442,20 @@ end
 
 opencv.CalcOpticalFlowPyrLK
    = function(...)
-	local args, image_from, image_to = 
+	local args, image_from, image_to =
 	   xlua.unpack(
 	   {...},
 	   'opencv.CalcOpticalFlowPyrLK',
 	   [[
 Computes the Pyramidal Lucas-Kanade optical flow algorithm of opencv.
   + input two images
-  + returns a points tensor of the sub-pixel positions of the features 
-and a copy of the input image with red lines indicating the flow from 
-the interest points 
-           ]], 
-	   {arg='image_from', type='torch.Tensor', 
+  + returns a points tensor of the sub-pixel positions of the features
+and a copy of the input image with red lines indicating the flow from
+the interest points
+           ]],
+	   {arg='image_from', type='torch.Tensor',
 	    help='image in which calculate from flow',req=true},
-	   {arg='image_to', type='torch.Tensor', 
+	   {arg='image_to', type='torch.Tensor',
 	    help='image in which calculate to flow',req=true}
 	)
 
@@ -388,42 +484,42 @@ function opencv.LowLevelConversions_testme(img)
       img = opencv.imgL()
    end
    local imgn = img:narrow(1,1,1)
-   local dst = torch.Tensor() 
-   
+   local dst = torch.Tensor()
+
    print('Testing torch>IPL8U ... 1 Channel')
    img.libopencv.test_torch2IPL8U(imgn,dst)
-   local err = (imgn-dst):max() 
-   if err > 1/255 then 
-      print ('  ERROR '..err) 
-   else 
-      print ('  OK') 
-   end 
+   local err = (imgn-dst):max()
+   if err > 1/255 then
+      print ('  ERROR '..err)
+   else
+      print ('  OK')
+   end
    print('Testing torch>IPL8U ... 3 Channels')
    img.libopencv.test_torch2IPL8U(img,dst)
-   local err = (img-dst):max() 
-   if err > 1/255 then 
-      print ('  ERROR '..err) 
-   else 
-      print ('  OK') 
-   end 
+   local err = (img-dst):max()
+   if err > 1/255 then
+      print ('  ERROR '..err)
+   else
+      print ('  OK')
+   end
    print('Testing torch>IPL32F ... 1 Channel')
    dst = torch.Tensor()
    img.libopencv.test_torch2IPL32F(imgn,dst)
-   err = (imgn-dst):max() 
-   if  err > 0 then 
-      print ('  ERROR '..err) 
-   else 
-      print ('  OK') 
-   end 
+   err = (imgn-dst):max()
+   if  err > 0 then
+      print ('  ERROR '..err)
+   else
+      print ('  OK')
+   end
    print('Testing torch>IPL32F ... 3 Channels')
    dst = torch.Tensor()
    img.libopencv.test_torch2IPL32F(img,dst)
-   err = (img-dst):max() 
-   if  err > 0 then 
-      print ('  ERROR '..err) 
-   else 
-      print ('  OK') 
-   end 
+   err = (img-dst):max()
+   if  err > 0 then
+      print ('  ERROR '..err)
+   else
+      print ('  OK')
+   end
 end
 
 
@@ -433,11 +529,11 @@ opencv.TrackPyrLK
 	local args, pair, points_in, win_size  = xlua.unpack(
 	   {...},
 	   'opencv.TrackPyrLK',
-	   [[Runs pyramidal Lucas-Kanade, on two input images and a set of 
-points which are meant to be tracked ]],
-	   {arg='pair', type='table', 
+	   [[Runs pyramidal Lucas-Kanade, on two input images and a set of
+                 points which are meant to be tracked ]],
+	   {arg='pair', type='table',
 	    help='a pair of images (2 WxHx1 tensor)', req=true},
-	   {arg='points_in',type='torch.Tensor', 
+	   {arg='points_in',type='torch.Tensor',
 	    help='points to track', req=true},
 	   {arg='win_size',type='number',
 	    help='over how large of a window can the LK track', default= 25}
@@ -446,7 +542,7 @@ points which are meant to be tracked ]],
 	local feature_found = torch.Tensor(points_in:size(1)):zero()
 	local feature_error = torch.Tensor(points_in:size(1)):zero()
 	pair[1].libopencv.TrackPyrLK(pair[1], pair[2], points_in, points_out, win_size, feature_found, feature_error)
-	   
+
 	return points_out, feature_found, feature_error
      end
 
@@ -456,7 +552,7 @@ opencv.drawFlowlinesOnImage
 	   {...},
 	   'opencv.drawFlowlinesOnImage',
 	   [[ utility to visualize sparse flows ]],
-	   {arg='pair', type='table', 
+	   {arg='pair', type='table',
 	    help='a pair of point tensors (2 nPointsx2 tensor)', req=true},
 	   {arg='image', type='torch.Tensor',
 	    help='image on which to draw the flowlines', req=true},
@@ -467,7 +563,7 @@ opencv.drawFlowlinesOnImage
 	)
 	if not color then
 	   color = torch.Tensor(3):zero()
-	   color[1] = 255 
+	   color[1] = 255
 	end
 	pair[1].libopencv.drawFlowlinesOnImage(pair[1],pair[2],image,color,mask)
      end
@@ -481,7 +577,7 @@ function opencv.TrackPyrLK_testme(imgL,imgR)
       imgR = opencv.imgR()
    end
    local ptsin = opencv.GoodFeaturesToTrack{image=imgL,count=imgL:nElement()}
-   
+
    local ptsout = opencv.TrackPyrLK{pair={imgL,imgR},points_in=ptsin}
    opencv.drawFlowlinesOnImage({ptsin,ptsout},imgR)
    image.display{image={imgL,imgR},
@@ -498,15 +594,15 @@ opencv.smoothVoronoi
 	   {...},
 	   'opencv.smoothVoronoi',
 	   [[ dense interpolation of sparse flows ]],
-	   {arg='points', type='torch.Tensor', 
+	   {arg='points', type='torch.Tensor',
 	    help='nPoints x 2 tensor -- locations', req=true},
-	   {arg='data', type='torch.Tensor', 
+	   {arg='data', type='torch.Tensor',
 	    help='nPoints x n tensor -- data', req=true},
 	   {arg='output', type='torch.Tensor',
 	    help='bounding rectangle in which dense flows will be stored'}
 	)
 	if not output then
-	   local width  = points:select(2,1):max() 
+	   local width  = points:select(2,1):max()
 	   local height = points:select(2,2):max()
            output = torch.Tensor(data:size(2),height,width)
 	end
@@ -523,7 +619,7 @@ function opencv.smoothVoronoi_testme(imgL,imgR)
    if not imgR then
       imgR = opencv.imgR()
    end
-   ptsin = opencv.GoodFeaturesToTrack{image=imgL,count=imgL:nElement()} 
+   ptsin = opencv.GoodFeaturesToTrack{image=imgL,count=imgL:nElement()}
    ptsout = opencv.TrackPyrLK{pair={imgL,imgR},points_in=ptsin}
    output = opencv.smoothVoronoi(ptsout,ptsout-ptsin)
    image.display{image={output:select(1,1),output:select(1,2)}}
