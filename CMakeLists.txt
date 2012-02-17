@@ -11,7 +11,7 @@ if (OpenCV_FOUND)
   set(src opencv.c)
   set(luasrc init.lua img1.jpg img2.jpg)
   ADD_TORCH_PACKAGE(opencv "${src}" "${luasrc}" "OpenCV wrapper")
-  TARGET_LINK_LIBRARIES(opencv luaT TH)
+  TARGET_LINK_LIBRARIES(opencv luaT TH ${OpenCV_LIBS})
 
 endif(OpenCV_FOUND)
    

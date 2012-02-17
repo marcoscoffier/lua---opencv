@@ -18,6 +18,9 @@
    - cvCalcOpticalFlowLK [C/C++]
 
  + opencv.CalcOpticalFlowPyrLK [lua]    --> cvCalcOpticalFlowPyrLK [C/C++]
+ + opencv.GoodFeaturesToTrack [lua]   --> cvGoodFeaturesToTrack [C/C++]
+ + opencv.DrawFlowlinesOnImage [lua]  --> cvDrawFlowlinesOnImage [C/C++]
+ + opencv.smoothVoronoi [lua] --> uses Voronoi triangulation to create dense map of a sparse set of points.
 
 ## who
 
