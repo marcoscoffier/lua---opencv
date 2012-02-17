@@ -419,11 +419,11 @@ opencv.GoodFeaturesToTrack
 	local img = image
 	local points = torch.Tensor(2,count)
 	img.libopencv.GoodFeaturesToTrack(img,
-                  							points,
-                  							count,
-                  							quality,
-                  							min_distance,
-                  							win_size)
+                                          points,
+                                          count,
+                                          quality,
+                                          min_distance,
+                                          win_size)
 	return points
      end
 
@@ -526,7 +526,7 @@ end
 -- Pyramidal Lucas-Kanade
 opencv.TrackPyrLK
    = function(...)
-	local args, pair, points_in, win_size  = xlua.unpack(
+	local args, pair, points_in, points_out, win_size  = xlua.unpack(
 	   {...},
 	   'opencv.TrackPyrLK',
 	   [[Runs pyramidal Lucas-Kanade, on two input images and a set of
@@ -535,14 +535,20 @@ opencv.TrackPyrLK
 	    help='a pair of images (2 WxHx1 tensor)', req=true},
 	   {arg='points_in',type='torch.Tensor',
 	    help='points to track', req=true},
+	   {arg='points_out',type='torch.Tensor', 
+	    help='tensor to return location of tracked points in output'},
 	   {arg='win_size',type='number',
 	    help='over how large of a window can the LK track', default= 25}
 	)
-	local points_out = torch.Tensor():resizeAs(points_in):zero()
+        if not points_out then 
+           points_out = torch.Tensor():resizeAs(points_in):zero()
+        end
 	local feature_found = torch.Tensor(points_in:size(1)):zero()
 	local feature_error = torch.Tensor(points_in:size(1)):zero()
-	pair[1].libopencv.TrackPyrLK(pair[1], pair[2], points_in, points_out, win_size, feature_found, feature_error)
-
+	pair[1].libopencv.TrackPyrLK(pair[1], pair[2], 
+                                     points_in, points_out, win_size, 
+                                     feature_found, feature_error)
+	   
 	return points_out, feature_found, feature_error
      end
 
