@@ -298,7 +298,7 @@ static CvPoint2D32f * libopencv_(Main_torch2opencvPoints)(THTensor *src) {
     points_cv[p].y = (float)THTensor_(get2d)(src, p, 1);
   }
 
-  // return freshly created IPL image
+  // return freshly created CvPoint2D32f
   return points_cv;
 }
 
@@ -1027,11 +1027,69 @@ static int libopencv_(Main_cvGetAffineTransform) (lua_State *L) {
 
   return 0;
 }
+
+/*
+ * compute fundamental matrix from matching points between 2 images
+ */
+static int libopencv_(Main_cvFindFundamental) (lua_State *L) {
+  THTensor * points1_th      = luaT_checkudata(L,1, torch_(Tensor_id));
+  THTensor * points2_th      = luaT_checkudata(L,2, torch_(Tensor_id));
+  THTensor * fundamental_th  = luaT_checkudata(L,3, torch_(Tensor_id));
+  THTensor * status_th       = luaT_checkudata(L,4, torch_(Tensor_id));
+  
+  THTensor_(resize2d)(fundamental_th,3,3);
+  
+  real * points1_pt = THTensor_(data)(points1_th);
+  real * points2_pt = THTensor_(data)(points2_th);
+  real * status_pt = THTensor_(data)(status_th);
+  
+  int    numPoints  = points1_th->size[0];
+  
+  CvMat* points1 = cvCreateMat(2,numPoints,CV_32F);
+  CvMat* points2 = cvCreateMat(2,numPoints,CV_32F);
+  
+  int i;
+  for ( i = 0; i < numPoints; i++) {
+    cvSetReal2D(points1,0,i,(float)*points1_pt++);
+    cvSetReal2D(points1,1,i,(float)*points1_pt++);
+
+    cvSetReal2D(points2,0,i,(float)*points2_pt++);
+    cvSetReal2D(points2,1,i,(float)*points2_pt++);
+  }
+
+  CvMat* status  = cvCreateMat(1,numPoints,CV_8U);
+  CvMat* fundamentalMatrix = cvCreateMat(3,3,CV_32F);
+  int    method = CV_FM_RANSAC;
+  double param1 = 1.;
+  double param2 = 0.99;
+                           
+  cvFindFundamentalMat(points1, points2, fundamentalMatrix,
+                       method,param1,param2,status);
+
+  int j;
+  for ( i = 0; i < 3; i++) {
+    for ( j = 0; j < 3; j++) {
+      THTensor_(set2d)(fundamental_th,i,j,
+                       (real)cvGetReal2D(fundamentalMatrix,i,j));
+    }
+  }
+  for ( i = 0; i < numPoints; i++) {
+    *status_pt++ = cvGetReal2D(status,0,i);
+  }
+  //cleanup
+  cvReleaseMat(&status);
+  cvReleaseMat(&fundamentalMatrix);
+  cvReleaseMat(&points1);
+  cvReleaseMat(&points2);
+  return 0;
+}
+
 //============================================================
 // Register functions in LUA
 //
 static const luaL_reg libopencv_(Main__) [] =
 {
+  {"FindFundamental",      libopencv_(Main_cvFindFundamental)},
   {"GetAffineTransform",   libopencv_(Main_cvGetAffineTransform)},
   {"WarpAffine",           libopencv_(Main_cvWarpAffine)},
   {"EqualizeHist",         libopencv_(Main_cvEqualizeHist)},

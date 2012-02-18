@@ -631,6 +631,43 @@ function opencv.smoothVoronoi_testme(imgL,imgR)
    image.display{image={output:select(1,1),output:select(1,2)}}
 end
 
+opencv.findFundamental
+   = function (...)
+	local args, points1, points2 = xlua.unpack(
+	   {...},
+	   'opencv.FindFundamental',
+	   [[ find fundamental matrix in 2 sets of points]],
+	   {arg='points1', type='torch.Tensor',
+	    help='nPoints x 2 tensor -- locations', req=true},
+	   {arg='points2', type='torch.Tensor',
+	    help='nPoints x 2 tensor -- locations', req=true}
+	)
+	if not output then
+           output = torch.Tensor(3,3)
+	end
+	if not status then
+           status = torch.Tensor(points1:size(1))
+	end
+
+        sys.tic()
+        points1.libopencv.FindFundamental(points1,points2,output,status)
+        print("time to compute fundamental matrix: ",sys.toc())
+	return output,status
+     end
+
+function opencv.findFundamental_testme(imgL,imgR)
+   if not imgL then
+      imgL = opencv.imgL()
+   end
+   if not imgR then
+      imgR = opencv.imgR()
+   end
+   ptsin  = opencv.GoodFeaturesToTrack{image=imgL,count=imgL:nElement()}
+   ptsout = opencv.TrackPyrLK{pair={imgL,imgR},points_in=ptsin}
+   matrix,status = opencv.findFundamental{points1=ptsin,points2=ptsout}
+   print(matrix)
+end
+
 function opencv.testme()
    local imgL = opencv.imgL()
    local imgR = opencv.imgR()
