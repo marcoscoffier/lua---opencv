@@ -290,12 +290,12 @@ static CvPoint2D32f * libopencv_(Main_torch2opencvPoints)(THTensor *src) {
   // create output
   CvPoint2D32f * points_cv = NULL;
   points_cv = (CvPoint2D32f*)cvAlloc(count*sizeof(points_cv[0]));
-
+  real * src_pt = THTensor_(data)(src);
   // copy
   int p;
   for (p=0; p<count; p++){
-    points_cv[p].x = (float)THTensor_(get2d)(src, p, 0);
-    points_cv[p].y = (float)THTensor_(get2d)(src, p, 1);
+    points_cv[p].x = (float)*src_pt++ ;
+    points_cv[p].y = (float)*src_pt++ ;
   }
 
   // return freshly created CvPoint2D32f
@@ -1025,6 +1025,19 @@ static int libopencv_(Main_cvGetAffineTransform) (lua_State *L) {
   cvFree(&dstTri);
   cvReleaseMat(&warp_mat);
 
+  return 0;
+}
+
+/*
+ * compute essential matrix from fundamental 
+ */
+static int libopencv_(Main_cvFindEssential) (lua_State *L) {
+  THTensor * fund = luaT_checkudata(L,1, torch_(Tensor_id));
+  THTensor * k    = luaT_checkudata(L,1, torch_(Tensor_id));
+
+  //CvMat* kt = cvCreateMat(
+  //  cvTranspose(k);
+  // cvSVD(CvArr* A, CvArr* W, CvArr* U=NULL, CvArr* V=NULL, int flags=0)
   return 0;
 }
 

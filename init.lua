@@ -432,11 +432,10 @@ function opencv.GoodFeaturesToTrack_testme(img)
    if not img then
       img = opencv.imgL()
    end
-   local pts, iout = opencv.GoodFeaturesToTrack{image=img,count=125}
-
-   image.display{image=iout,
-		 legends={'Good Features'},
-		 legend='opencv: GoodFeaturesToTrack'}
+   sys.tic()
+   local pts = opencv.GoodFeaturesToTrack{image=img,count=125}
+   local s = sys.toc()
+   print("Found "..pts:size(1).." points in "..s.." secs")
 end
 
 
