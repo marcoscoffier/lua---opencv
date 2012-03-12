@@ -22,7 +22,7 @@
 --
 
 require 'torch'
-require 'xlua'
+require 'dok'
 require 'image'
 
 opencv = {}
@@ -33,7 +33,7 @@ require 'libopencv'
 
 -- Canny
 function opencv.Canny(...)
-   local _, source, low_threshold, high_threshold, aperturesize = xlua.unpack(
+   local _, source, low_threshold, high_threshold, aperturesize = dok.unpack(
       {...},
       'opencv.Canny',
       'Implements the Canny algorithm for edge detection.',
@@ -66,7 +66,7 @@ end
 
 
 function opencv.GetAffineTransform(...)
-   local args,  points_src, points_dst  = xlua.unpack(
+   local args,  points_src, points_dst  = dok.unpack(
       {...},
       'opencv.GetAffineTransform',
       [[Calculates the affine transform from 3 corresponding points. ]],
@@ -105,7 +105,7 @@ end
 
 -- WarpAffine
 function opencv.WarpAffine(...)
-   local _, source,warp = xlua.unpack(
+   local _, source,warp = dok.unpack(
       {...},
       'opencv.WarpAffine',
       [[Implements the affine transform which allows the user to warp,
@@ -156,7 +156,7 @@ end
 
 -- EqualizeHist
 function opencv.EqualizeHist(...)
-   local _, source = xlua.unpack(
+   local _, source = dok.unpack(
       {...},
       'opencv.EqualizeHist',
       'Implements the Histogram Equalization algorithm.',
@@ -177,7 +177,7 @@ end
 
 -- CornerHarris
 function opencv.CornerHarris(...)
-   local _, img, blocksize, aperturesize, k = xlua.unpack(
+   local _, img, blocksize, aperturesize, k = dok.unpack(
       {...},
       'opencv.CornerHarris',
       'Computes the Harris Corner features of an image the input image will be converted to a WxHx1 tensor',
@@ -230,7 +230,7 @@ function opencv.CalcOpticalFlow(...)
    local args, pair, method, block_w, block_h,
    shift_x, shift_y, window_w, window_h,
    lagrangian, iterations, autoscale,
-   raw, reuse, flow_x, flow_y = xlua.unpack(
+   raw, reuse, flow_x, flow_y = dok.unpack(
       {...},
       'opencv.CalcOpticalFlow',
       [[
@@ -276,7 +276,7 @@ function opencv.CalcOpticalFlow(...)
    )
 
    if pair[1]:nDimension() ~= 3 then
-      xlua.error('inconsistent input size'..args.usage,
+      dok.error('inconsistent input size'..args.usage,
 		 'opencv.CalcOpticalFlow')
    end
 
@@ -403,7 +403,7 @@ end
 opencv.GoodFeaturesToTrack
    = function(...)
 	local args, image, count, quality, min_distance, win_size  =
-	   xlua.unpack(
+	   dok.unpack(
 	   {...},
 	   'opencv.GoodFeaturesToTrack',
 	   [[
@@ -442,7 +442,7 @@ end
 opencv.CalcOpticalFlowPyrLK
    = function(...)
 	local args, image_from, image_to =
-	   xlua.unpack(
+	   dok.unpack(
 	   {...},
 	   'opencv.CalcOpticalFlowPyrLK',
 	   [[
@@ -525,7 +525,7 @@ end
 -- Pyramidal Lucas-Kanade
 opencv.TrackPyrLK
    = function(...)
-	local args, pair, points_in, points_out, win_size  = xlua.unpack(
+	local args, pair, points_in, points_out, win_size  = dok.unpack(
 	   {...},
 	   'opencv.TrackPyrLK',
 	   [[Runs pyramidal Lucas-Kanade, on two input images and a set of
@@ -553,7 +553,7 @@ opencv.TrackPyrLK
 
 opencv.drawFlowlinesOnImage
    = function (...)
-	local args, pair, image, color, mask = xlua.unpack(
+	local args, pair, image, color, mask = dok.unpack(
 	   {...},
 	   'opencv.drawFlowlinesOnImage',
 	   [[ utility to visualize sparse flows ]],
@@ -595,7 +595,7 @@ end
 
 opencv.smoothVoronoi
    = function (...)
-	local args, points, data, output = xlua.unpack(
+	local args, points, data, output = dok.unpack(
 	   {...},
 	   'opencv.smoothVoronoi',
 	   [[ dense interpolation of sparse flows ]],
@@ -632,7 +632,7 @@ end
 
 opencv.findFundamental
    = function (...)
-	local args, points1, points2 = xlua.unpack(
+	local args, points1, points2 = dok.unpack(
 	   {...},
 	   'opencv.FindFundamental',
 	   [[ find fundamental matrix in 2 sets of points]],
@@ -647,10 +647,7 @@ opencv.findFundamental
 	if not status then
            status = torch.Tensor(points1:size(1))
 	end
-
-        sys.tic()
         points1.libopencv.FindFundamental(points1,points2,output,status)
-        print("time to compute fundamental matrix: ",sys.toc())
 	return output,status
      end
 
@@ -661,10 +658,118 @@ function opencv.findFundamental_testme(imgL,imgR)
    if not imgR then
       imgR = opencv.imgR()
    end
-   ptsin  = opencv.GoodFeaturesToTrack{image=imgL,count=imgL:nElement()}
-   ptsout = opencv.TrackPyrLK{pair={imgL,imgR},points_in=ptsin}
-   matrix,status = opencv.findFundamental{points1=ptsin,points2=ptsout}
+   sys.tic()
+   local ptsin  = opencv.GoodFeaturesToTrack{image=imgL,count=imgL:nElement()}
+   local ptsout = opencv.TrackPyrLK{pair={imgL,imgR},points_in=ptsin}
+   print("time to compute good features: ",sys.toc())
+   sys.tic()
+   local matrix,status = opencv.findFundamental{points1=ptsin,points2=ptsout}
+   print("time to compute fundamental matrix: ",sys.toc())
    print(matrix)
+end
+
+opencv.findEssential
+   = function (...)
+	local args, fundamental, calibration = dok.unpack(
+	   {...},
+	   'opencv.FindEssential',
+	   [[ find essential matrix from fundamental and calibration]],
+	   {arg='fundamental', type='torch.Tensor',
+	    help='3x3 fundamental matrix', req=true},
+	   {arg='calibration', type='torch.Tensor',
+	    help='3x3 tensor -- camera calibration', req=true}
+	)
+        return calibration:transpose(1,2) * fundamental * calibration
+     end
+
+function opencv.findEssential_testme(imgL,imgR)
+   if not imgL then
+      imgL = opencv.imgL()
+   end
+   if not imgR then
+      imgR = opencv.imgR()
+   end
+   sys.tic()
+   local ptsin  = opencv.GoodFeaturesToTrack{image=imgL,count=imgL:nElement()}
+   local ptsout = opencv.TrackPyrLK{pair={imgL,imgR},points_in=ptsin}
+   print("time to compute good features: ",sys.toc())
+   sys.tic()
+   local fundmat,status = opencv.findFundamental{points1=ptsin,points2=ptsout}
+   print("time to compute fundamental matrix: ",sys.toc())
+   local k = torch.Tensor(3,3):fill(0)
+   k[1][1] = 602 -- focal length in pixels
+   k[2][2] = 602 -- focal length in pixels
+   k[1][3] = 1280/2 -- center width
+   k[2][3] = 720/2 -- center height
+   k[3][3] = 1
+   sys.tic()
+   local essenmat = opencv.findEssential(fundmat, k)
+   print("time to compute essential matrix: ",sys.toc())
+   print(essenmat)
+end
+
+opencv.getExtrinsicsFromEssential
+   = function (...)
+	local args, essential, point = dok.unpack(
+	   {...},
+	   'opencv.getExtrinsicsFromEssential',
+	   [[ get camera extrinsic matrix from essential matrix and a single point]],
+	   {arg='essential', type='torch.Tensor',
+	    help='3x3 essential matrix', req=true},
+	   {arg='point', type='torch.Tensor',
+	    help='3x1 tensor -- 3D point', req=true}
+	)
+        -- u*torch.diag(s)*v:t()
+        local u,s,v = torch.svd(essential)
+        -- if ((math.abs(s[1] - s[2]) > 0.1) or math.abs(s[3]) > 0.01) then
+        --    dok.error("bad essential matrix")
+        -- end
+        print("U")
+        print(u)
+        print("S - diagonal")
+        print(s)
+        print("V -- which you transpose")
+        print(v)
+        local w = torch.Tensor(3,3)
+        w[1][2] = -1
+        w[2][1] =  1
+        w[3][3] =  1
+        local z = torch.Tensor(3,3)
+        z[1][2] =  1
+        z[2][1] = -1
+        extr = torch.Tensor(3,4)
+        extr:narrow(2,1,3):copy(u*w*v:t())
+        extr:narrow(2,3,1):copy(u:narrow(1,3,1))
+        print(extr)
+     end
+
+function opencv.getExtrinsicsFromEssential_testme(imgL,imgR)
+   if not imgL then
+      imgL = opencv.imgL()
+   end
+   if not imgR then
+      imgR = opencv.imgR()
+   end
+   sys.tic()
+   local ptsin  = opencv.GoodFeaturesToTrack{image=imgL,count=imgL:nElement()}
+   local ptsout = opencv.TrackPyrLK{pair={imgL,imgR},points_in=ptsin}
+   print("time to compute good features: ",sys.toc())
+   sys.tic()
+   local fundmat,status = opencv.findFundamental{points1=ptsin,points2=ptsout}
+   print("time to compute fundamental matrix: ",sys.toc())
+   local k = torch.Tensor(3,3):fill(0)
+   k[1][1] = 602 -- focal length in pixels
+   k[2][2] = 602 -- focal length in pixels
+   k[1][3] = 1280/2 -- center width
+   k[2][3] = 720/2 -- center height
+   k[3][3] = 1
+   sys.tic()
+   local essenmat = opencv.findEssential(fundmat, k)
+   print("time to compute essential matrix: ",sys.toc())
+   sys.tic()
+   local extrmat = opencv.getExtrinsicsFromEssential(essenmat,ptsout[1])
+   print("time to get extrinsics from essential: ",sys.toc())
+
 end
 
 function opencv.testme()
