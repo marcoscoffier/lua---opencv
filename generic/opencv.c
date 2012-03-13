@@ -302,29 +302,6 @@ static CvPoint2D32f * libopencv_(Main_torch2opencvPoints)(THTensor *src) {
 }
 
 
-static int libopencv_(Main_testTH2IPL8U)(lua_State *L) {
-  THTensor * src  = luaT_checkudata(L, 1, torch_(Tensor_id));
-  THTensor * dst  = luaT_checkudata(L, 2, torch_(Tensor_id));
-  IplImage * ipl = libopencv_(Main_torchimg2opencv_8U)(src);
-  real *src_data = THTensor_(data)(src);
-
-  libopencv_(Main_opencv8U2torch)(ipl, dst);
-  real *dst_data = THTensor_(data)(dst);
-  cvReleaseImage(&ipl);
-  return 0;
-}
-static int libopencv_(Main_testTH2IPL32F)(lua_State *L) {
-  THTensor * src  = luaT_checkudata(L, 1, torch_(Tensor_id));
-  THTensor * dst  = luaT_checkudata(L, 2, torch_(Tensor_id));
-  IplImage * ipl = libopencv_(Main_torchimg2opencv_32F)(src);
-  real *src_data = THTensor_(data)(src);
-
-  libopencv_(Main_opencv32F2torch)(ipl, dst);
-  real *dst_data = THTensor_(data)(dst);
-  cvReleaseImage(&ipl);
-  return 0;
-}
-
 //============================================================
 static int libopencv_(Main_cvCornerHarris) (lua_State *L) {
   // Get Tensor's Info
@@ -793,11 +770,9 @@ static int libopencv_(Main_smoothVoronoi) (lua_State *L) {
   THTensor * data   = luaT_checkudata(L,2, torch_(Tensor_id));
   THTensor * output = luaT_checkudata(L,3, torch_(Tensor_id));
   real * output_pt[8];
-  real * data_pt;
-  int i,j;
+  int i;
   output_pt[0] = THTensor_(data)(output);
-  data_pt = THTensor_(data)(data);
-
+  
   for (i=1;i<output->size[0];i++){
     output_pt[i] = output_pt[0] + i*output->stride[0];
   }
@@ -838,7 +813,6 @@ static int libopencv_(Main_smoothVoronoi) (lua_State *L) {
   CvSubdiv2DEdge e0 = 0;
   CvSubdiv2DPoint* p = NULL;
   CvSubdiv2DPoint* org = NULL;
-  CvSubdiv2DPoint* dst = NULL;
   real data_w[3][8];
   real data_x[3];
   real data_y[3];
@@ -856,12 +830,10 @@ static int libopencv_(Main_smoothVoronoi) (lua_State *L) {
             // Do something with e ...
             e   = cvSubdiv2DGetEdge(e,CV_NEXT_AROUND_LEFT);
             org = cvSubdiv2DEdgeOrg(e);
-            dst = cvSubdiv2DEdgeDst(e);
             data_x[count] = org->pt.x;
             data_y[count] = org->pt.y;
             for(i=0;i<data->size[1];i++){
               data_w[count][i] = THTensor_(get2d)(data,org->flags,i);
-              //data_w[count][i] = (data_pt + (org->flags*data->stride[1] + i))[0];
             }
             count++;
           }
@@ -875,7 +847,7 @@ static int libopencv_(Main_smoothVoronoi) (lua_State *L) {
           data_x[2]*data_y[1] +
           data_x[2]*data_y[0] -
           data_x[0]*data_y[2];
-        real A,B,C,w;
+        real A,B,C;
 
         for (i=0;i<output->size[0];i++){
           A = ((data_y[1]-data_y[2])*data_w[0][i] +
@@ -1101,8 +1073,6 @@ static const luaL_reg libopencv_(Main__) [] =
   {"CalcOpticalFlow",      libopencv_(Main_cvCalcOpticalFlow)},
   {"CornerHarris",         libopencv_(Main_cvCornerHarris)},
   {"GoodFeaturesToTrack",  libopencv_(Main_cvGoodFeaturesToTrack)},
-  {"test_torchimg2IPL32F",    libopencv_(Main_testTH2IPL32F)},
-  {"test_torchimg2IPL8U",     libopencv_(Main_testTH2IPL8U)},
   {NULL, NULL}  /* sentinel */
 };
 
