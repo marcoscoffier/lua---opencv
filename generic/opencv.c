@@ -772,7 +772,7 @@ static int libopencv_(Main_smoothVoronoi) (lua_State *L) {
   real * output_pt[8];
   int i;
   output_pt[0] = THTensor_(data)(output);
-  
+
   for (i=1;i<output->size[0];i++){
     output_pt[i] = output_pt[0] + i*output->stride[0];
   }
@@ -878,30 +878,136 @@ static int libopencv_(Main_cvCanny) (lua_State *L) {
   THTensor * source = luaT_checkudata(L, 1, torch_(Tensor_id));
   THTensor * dest   = luaT_checkudata(L, 2, torch_(Tensor_id));
 
-  // Generate IPL headers
-  IplImage * source_ipl = libopencv_(Main_torchimg2opencv_8U)(source);
+  /* first convert the tensors into proper opencv Canny format */
+
+  // Pointers
+  uchar * source_data;
+  int channels = source->size[0];
+  int source_step;
+  CvSize source_size = cvSize(source->size[2], source->size[1]);
+
+  // Create ipl image
+  IplImage * source_ipl = cvCreateImage(source_size, IPL_DEPTH_8U, channels);
+
+  // get pointer to raw data
+  cvGetRawData(source_ipl, (uchar**)&source_data, &source_step, &source_size);
+
+  // copy
+  THTensor *tensor = THTensor_(newContiguous)(source);
+  int i = 0;
+  for (i=0;i<source->size[1];i++){
+    uchar * sourcep = source_data + source_step*i;
+    THTensor *tslice = THTensor_(newSelect)(tensor,1,i);
+    // copy
+    TH_TENSOR_APPLY(real, tslice,
+                    *sourcep = (uchar)(*tslice_data * 255.0);
+                    sourcep++;
+		    );
+    THTensor_(free)(tslice);
+  }
+  // free
+  THTensor_(free)(tensor);
+
   IplImage * dest_ipl = cvCreateImage(cvGetSize(source_ipl), IPL_DEPTH_8U,
                                       source_ipl->nChannels);
 
+  /* read the params values */
   // Thresholds with default values
-  double low_threshold = 0;
-  double high_threshold = 1;
+  double low_threshold = 50;
+  double high_threshold = 150;
+  int blur_size = 3;
   int aperture_size = 3;
   if (lua_isnumber(L, 3)) low_threshold = lua_tonumber(L, 3);
   if (lua_isnumber(L, 4)) high_threshold = lua_tonumber(L, 4);
-  if (lua_isnumber(L, 5)) aperture_size = lua_tonumber(L, 5);
+  if (lua_isnumber(L, 5)) blur_size = lua_tonumber(L, 5);
+  if (lua_isnumber(L, 6)) aperture_size = lua_tonumber(L, 6);
+  // if we have a percent argument we need to find the thresholds
+  if (lua_isnumber(L, 7))
+    { // here we compute the sobel filtering and its histogram
+      // to assess where the thresholds should be
+      // this code is inspired of the matlab method
+      double percent = lua_tonumber(L, 7);
+      double vmin,vmax;
+      CvSize size = cvGetSize(source_ipl);
+      IplImage* mag = cvCreateImage(size, IPL_DEPTH_32F,1);
+      cvSetZero(mag);
+      IplImage* drv = cvCreateImage(size, IPL_DEPTH_16S,1);
+      IplImage* drv32f = cvCreateImage(size, IPL_DEPTH_32F,1);
+      cvSobel(source_ipl, drv, 1 , 0, aperture_size);
+      cvConvertScale(drv,drv32f,1,0);
+      cvSquareAcc(drv32f,mag,NULL);
+      cvSobel(source_ipl, drv, 0 , 1, aperture_size);
+      cvConvertScale(drv,drv32f,1,0);
+      cvSquareAcc(drv32f,mag,NULL);
+      cvbSqrt((float*)(mag->imageData),(float*)(mag->imageData), mag->imageSize/sizeof(float));
+      cvReleaseImage(&drv);
+      cvReleaseImage(&drv32f);
+      // compute histogram
+      #define NB_BINS 64
+      int nbBins = NB_BINS;
+      CvHistogram *hist;
+      cvMinMaxLoc(mag,&vmin,&vmax,NULL,NULL,NULL);
+      float hranges_arr[] = {(float)vmin,(float)vmax};
+      float* hranges = hranges_arr;
+      hist = cvCreateHist(1,&nbBins,CV_HIST_ARRAY,&hranges,1);
+      cvCalcHist(&mag,hist,0,NULL);
+      cvReleaseImage(&mag);
+      CvMat mat;
+      cvGetMat(hist->bins, &mat, 0 , 1);
+      double binStep = (vmax-vmin)/NB_BINS;
+      double qty = 100;
+      double nbelmts = 0;
+      int idx=0;
+      double tot = (size.height*size.width);
+      while (qty > percent && idx < mat.rows)
+        {
+          nbelmts += cvmGet(&mat,idx,0);
+          qty = (tot-nbelmts)*100/tot;
+          idx++;
+        }
+      high_threshold = (double)idx*binStep;
+      low_threshold = 0.4*high_threshold;
+    }
 
-  // Simple call to CV function
-  cvCanny(source_ipl, dest_ipl, low_threshold, high_threshold, aperture_size);
+  /* now gaussian smooth to reduce the noise */
+  if (blur_size > 1)
+    {
+      cvSmooth(source_ipl, dest_ipl, CV_GAUSSIAN, blur_size, blur_size, 0, 0);
+      // Simple call to CV function
+      cvCanny(dest_ipl, dest_ipl, low_threshold, high_threshold, aperture_size);
+    }
+  else
+    {
+      // Simple call to CV function
+      cvCanny(source_ipl, dest_ipl, low_threshold, high_threshold, aperture_size);
+    }
 
-  // return results
-  libopencv_(Main_opencv8U2torch)(dest_ipl, dest);
+  /* there was a bug in converting the result back in torch format */
+  /* so I wrote my own */
+  CvMat dststub, * dmat =  cvGetMat( dest_ipl, &dststub, NULL, 0 );
+  THTensor_(resize2d)(dest, dmat->rows, dmat->cols);
+  tensor = THTensor_(newContiguous)(dest);
+  for(i = 0; i < dmat->rows; i++ )
+    {
+      const uchar* dmat_p =  dmat->data.ptr + dmat->step*i;
+      THTensor *tslice = THTensor_(newSelect)(tensor,0,i);
+      // copy
+      TH_TENSOR_APPLY(real, tslice,
+                      *tslice_data = ((real)(*dmat_p))/255.0;
+                      dmat_p++;
+                      );
+      THTensor_(free)(tslice);
+    }
+  THTensor_(free)(tensor);
 
   // Deallocate headers
   cvReleaseImageHeader(&source_ipl);
   cvReleaseImageHeader(&dest_ipl);
 
-  return 0;
+  // return the thresholds used for the computation
+  lua_pushnumber(L, low_threshold);
+  lua_pushnumber(L, high_threshold);
+  return 2;
 }
 
 //============================================================
@@ -1007,18 +1113,18 @@ static int libopencv_(Main_cvFindFundamental) (lua_State *L) {
   THTensor * points2_th      = luaT_checkudata(L,2, torch_(Tensor_id));
   THTensor * fundamental_th  = luaT_checkudata(L,3, torch_(Tensor_id));
   THTensor * status_th       = luaT_checkudata(L,4, torch_(Tensor_id));
-  
+
   THTensor_(resize2d)(fundamental_th,3,3);
-  
+
   real * points1_pt = THTensor_(data)(points1_th);
   real * points2_pt = THTensor_(data)(points2_th);
   real * status_pt = THTensor_(data)(status_th);
-  
+
   int    numPoints  = points1_th->size[0];
-  
+
   CvMat* points1 = cvCreateMat(2,numPoints,CV_32F);
   CvMat* points2 = cvCreateMat(2,numPoints,CV_32F);
-  
+
   int i;
   for ( i = 0; i < numPoints; i++) {
     cvSetReal2D(points1,0,i,(float)*points1_pt++);
@@ -1033,7 +1139,7 @@ static int libopencv_(Main_cvFindFundamental) (lua_State *L) {
   int    method = CV_FM_RANSAC;
   double param1 = 1.;
   double param2 = 0.99;
-                           
+
   cvFindFundamentalMat(points1, points2, fundamentalMatrix,
                        method,param1,param2,status);
 
