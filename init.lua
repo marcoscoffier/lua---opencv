@@ -590,14 +590,13 @@ opencv.circlePoints
 	)
 	if not color then
 	   color = torch.Tensor(3):zero()
-	   color[1] = 255
+	   color[2] = 255
 	end
         if not size then
            size = 10
         end
 	points.libopencv.circlePoints(points,image,color,size)
      end
-end
 
 function opencv.TrackPyrLK_testme(imgL,imgR)
    if not imgL then
