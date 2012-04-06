@@ -726,6 +726,35 @@ static int libopencv_(Main_cvTrackPyrLK) (lua_State *L) {
   return 0;
 }
 
+
+//============================================================
+// draws circles around points to (for visualizing interest points)
+static int libopencv_(Main_cvCirclePoints) (lua_State *L) {
+  THTensor * points  = luaT_checkudata(L,1, torch_(Tensor_id));
+  THTensor * image   = luaT_checkudata(L,2, torch_(Tensor_id));
+  THTensor * color   = luaT_checkudata(L,3, torch_(Tensor_id));
+  int size = 10;
+  if (lua_isnumber(L, 4)) size = lua_tonumber(L, 4);
+  
+  IplImage * image_ipl = libopencv_(Main_torchimg2opencv_8U)(image);
+  CvScalar color_cv  = CV_RGB(THTensor_(get1d)(color,0),
+                              THTensor_(get1d)(color,1),
+                              THTensor_(get1d)(color,2));
+  int count = points->size[0];
+  CvPoint2D32f* points_cv = libopencv_(Main_torch2opencvPoints)(points);
+  
+  int i;
+  for( i = 0; i < count; i++ ) {
+    cvCircle(image_ipl, cvPointFrom32f(points_cv[i]), size, color_cv, 1, 8,0);
+  }
+
+  // return results
+  libopencv_(Main_opencv8U2torch)(image_ipl, image);
+  cvReleaseImage( &image_ipl );
+  return 0;
+}
+
+  
 //============================================================
 // draws red flow lines on an image (for visualizing the flow)
 static int libopencv_(Main_cvDrawFlowlinesOnImage) (lua_State *L) {
@@ -1068,6 +1097,7 @@ static const luaL_reg libopencv_(Main__) [] =
   {"Canny",                libopencv_(Main_cvCanny)},
   {"smoothVoronoi",        libopencv_(Main_smoothVoronoi)},
   {"drawFlowlinesOnImage", libopencv_(Main_cvDrawFlowlinesOnImage)},
+  {"circlePoints",         libopencv_(Main_cvCirclePoints)},
   {"TrackPyrLK",           libopencv_(Main_cvTrackPyrLK)},
   {"CalcOpticalFlowPyrLK", libopencv_(Main_cvCalcOpticalFlowPyrLK)},
   {"CalcOpticalFlow",      libopencv_(Main_cvCalcOpticalFlow)},

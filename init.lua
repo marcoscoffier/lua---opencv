@@ -573,6 +573,31 @@ opencv.drawFlowlinesOnImage
 	pair[1].libopencv.drawFlowlinesOnImage(pair[1],pair[2],image,color,mask)
      end
 
+opencv.circlePoints
+   = function (...)
+	local args, points, image, color, size = dok.unpack(
+	   {...},
+	   'opencv.circlePoints',
+	   [[ draw circles around interest points ]],
+	   {arg='points', type='torch.Tensor',
+	    help='a point tensor (nPointsx2 tensor)', req=true},
+	   {arg='image', type='torch.Tensor',
+	    help='image on which to draw the circles', req=true},
+	   {arg='color', type='torch.Tensor',
+	    help='color of flow line eg. R = [255,0,0]'},
+	   {arg='size', type='number',
+	    help='size of the circles to draw'}
+	)
+	if not color then
+	   color = torch.Tensor(3):zero()
+	   color[1] = 255
+	end
+        if not size then
+           size = 10
+        end
+	points.libopencv.circlePoints(points,image,color,size)
+     end
+end
 
 function opencv.TrackPyrLK_testme(imgL,imgR)
    if not imgL then
