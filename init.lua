@@ -808,18 +808,60 @@ function opencv.getExtrinsicsFromEssential_testme(imgL,imgR)
    print("time to get extrinsics from essential: ",sys.toc())
 
 end
-function opencv.video_testme()
-   local vf = libopencv.videoLoadFile("/home/data/gopro/carapp/IMG_0020.MOV.mp4.webm")
-   local img = torch.Tensor()
-   local fps = libopencv.videoGetProperty(5)
-   img.libopencv.videoGetFrame(img)
-   win = image.display(img)
-   libopencv.videoSeek(10) 
-   for i = 1,100 do
-      img.libopencv.videoGetFrame(img)
-      win = image.display{image=img, win=win}
+
+opencv.videoForward = 
+   function (...)
+      local args, tensor, videoid  = dok.unpack(
+         {...},
+         'opencv.videoForward',
+         [[ Grabs next frame from an open video stream ]],
+         {arg='tensor', type='torch.Tensor',
+          help='tensor in which you want to store the frame'},
+         {arg='videoid', type='int', 
+          help='id of video file (can have multiple open video files)',
+          default=0}
+      )
+      if not tensor then
+         tensor = torch.Tensor()
+      end
+      tensor.libopencv.videoGetFrame(tensor,videoid)
+      return tensor
    end
-end
+           
+opencv.video_testme = 
+   function (...)
+	local args, fname, seekto, duration = dok.unpack(
+	   {...},
+	   'opencv.video_testme',
+	   [[ open video file, seek and play]],
+	   {arg='fname', type='string',
+	    help='filename of video file', req=true},
+	   {arg='seekto', type='float',
+	    help='position in sec (float)', default=10},
+	   {arg='duration', type='float',
+	    help='number of seconds to play', default=10}
+	)
+        local vid = opencv.videoLoadFile(fname)
+        print("Opened " .. fname)
+        print(" Video id     : " .. vid )
+        local img = torch.Tensor()
+        local fps = opencv.videoGetFPS()
+        print(" FPS          : " .. fps)
+        local msec = opencv.videoSeek(seekto)
+        print(" Seek request : " .. seekto .. "s")
+        print(" Seeked to    : " .. msec*0.001 .."s")
+        print(" Playing for  : " .. duration .. "s")
+        for i = 1,duration*fps do
+           opencv.videoForward(img)
+           win = image.display{image=img, win=win}
+           if (i == 1) then
+              print(" 1st frame at : " .. 
+                    opencv.videoGetMSEC()*0.001 .."s") 
+           end
+        end
+        print(" Closing id   : " .. vid)
+        opencv.videoCloseFile()
+     end
 
 function opencv.testme()
    local imgL = opencv.imgL()
