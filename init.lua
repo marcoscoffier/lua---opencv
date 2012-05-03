@@ -558,7 +558,7 @@ opencv.drawFlowlinesOnImage
 	   'opencv.drawFlowlinesOnImage',
 	   [[ utility to visualize sparse flows ]],
 	   {arg='pair', type='table',
-	    help='a pair of point tensors (2 nPointsx2 tensor)', req=true},
+	    help='a pair of point tensors (2 nPointsx(2 or 3) tensor)', req=true},
 	   {arg='image', type='torch.Tensor',
 	    help='image on which to draw the flowlines', req=true},
 	   {arg='color', type='torch.Tensor',
@@ -566,6 +566,7 @@ opencv.drawFlowlinesOnImage
 	   {arg='mask', type='torch.Tensor',
 	    help='mask tensor 1D npoints 0 when not to draw point'}
 	)
+        -- default color is red
 	if not color then
 	   color = torch.Tensor(3):zero()
 	   color[1] = 255
@@ -580,7 +581,7 @@ opencv.circlePoints
 	   'opencv.circlePoints',
 	   [[ draw circles around interest points ]],
 	   {arg='points', type='torch.Tensor',
-	    help='a point tensor (nPointsx2 tensor)', req=true},
+	    help='a point tensor (nPointsx(2or3) tensor)', req=true},
 	   {arg='image', type='torch.Tensor',
 	    help='image on which to draw the circles', req=true},
 	   {arg='color', type='torch.Tensor',
@@ -588,9 +589,10 @@ opencv.circlePoints
 	   {arg='size', type='number',
 	    help='size of the circles to draw'}
 	)
+        -- default color is red
 	if not color then
 	   color = torch.Tensor(3):zero()
-	   color[2] = 255
+	   color[1] = 255
 	end
         if not size then
            size = 10
@@ -794,6 +796,18 @@ function opencv.getExtrinsicsFromEssential_testme(imgL,imgR)
    local extrmat = opencv.getExtrinsicsFromEssential(essenmat,ptsout[1])
    print("time to get extrinsics from essential: ",sys.toc())
 
+end
+function opencv.video_testme()
+   local vf = libopencv.videoLoadFile("/home/data/gopro/carapp/IMG_0020.MOV.mp4.webm")
+   local img = torch.Tensor()
+   local fps = libopencv.videoGetProperty(5)
+   img.libopencv.videoGetFrame(img)
+   win = image.display(img)
+   libopencv.videoSeek(10) 
+   for i = 1,100 do
+      img.libopencv.videoGetFrame(img)
+      win = image.display{image=img, win=win}
+   end
 end
 
 function opencv.testme()

@@ -286,15 +286,21 @@ static void libopencv_(Main_opencvPoints2torch)(CvPoint2D32f * points, int npoin
 static CvPoint2D32f * libopencv_(Main_torch2opencvPoints)(THTensor *src) {
 
   int count = src->size[0];
+  int dims  = src->size[1];
   // create output
   CvPoint2D32f * points_cv = NULL;
   points_cv = (CvPoint2D32f*)cvAlloc(count*sizeof(points_cv[0]));
   real * src_pt = THTensor_(data)(src);
   // copy
-  int p;
+  int p,q;
   for (p=0; p<count; p++){
     points_cv[p].x = (float)*src_pt++ ;
     points_cv[p].y = (float)*src_pt++ ;
+    if (dims > 2) {
+      for (q=2 ; q<dims ; q++){
+        src_pt++;
+      }
+    }
   }
 
   // return freshly created CvPoint2D32f
@@ -1084,6 +1090,32 @@ static int libopencv_(Main_cvFindFundamental) (lua_State *L) {
   return 0;
 }
 
+/*
+ * get frame from open video file and copy to torch tensor
+ */
+static int libopencv_(Main_cvGetFrame)(lua_State *L) {
+  THTensor * dest   = luaT_checkudata(L, 1, torch_(Tensor_id));
+  /* stream defaults to 0 */
+  int cidx = 0;
+  if (lua_isnumber(L,2)){
+    cidx = lua_tonumber(L,2);
+  }
+  /* is vid file open ? */
+  if (cidx >  fidx) {
+    perror("no open video at index");
+  }
+  
+  frame[cidx] = cvQueryFrame ( vfile[cidx] );
+
+  if ( frame[cidx] == NULL ) {
+    perror("OpenCV failed to load frame");
+  }
+
+  // return results
+  libopencv_(Main_opencv8U2torch)(frame[cidx], dest);
+
+  return 0;
+}
 
 //============================================================
 // Register functions in LUA
@@ -1103,6 +1135,7 @@ static const luaL_reg libopencv_(Main__) [] =
   {"CalcOpticalFlow",      libopencv_(Main_cvCalcOpticalFlow)},
   {"CornerHarris",         libopencv_(Main_cvCornerHarris)},
   {"GoodFeaturesToTrack",  libopencv_(Main_cvGoodFeaturesToTrack)},
+  {"videoGetFrame",             libopencv_(Main_cvGetFrame)},
   {NULL, NULL}  /* sentinel */
 };
 
