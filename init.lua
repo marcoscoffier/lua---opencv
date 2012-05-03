@@ -33,18 +33,25 @@ require 'libopencv'
 
 -- Canny
 function opencv.Canny(...)
-   local _, source, low_threshold, high_threshold, aperturesize = dok.unpack(
+   local _, source, percent, low_threshold, high_threshold, blursize, aperturesize = dok.unpack(
+      --local _, source, low_threshold, high_threshold, aperturesize = dok.unpack(
       {...},
       'opencv.Canny',
-      'Implements the Canny algorithm for edge detection.',
+      [[Implements the Canny algorithm for edge detection.
+            return Tensor of edges, low_threshold,high_threshold (thresholds used for the computation)]],
       {arg='source', type='torch.Tensor',
        help='image in which to perform edge detection', req=true},
-      {arg='low_threshold',type='number',
-       help=[[The smallest value between low_threshold and high_threshold is used
+      {arg='percent',type='number',
+       help='determine automatically low and high threshold'},
+      {arg='low',type='number',
+       help=[[The smallest value between low and high is used
              for edge linking, the largest value is used to find the initial segments
-             of strong edges.]], default=0},
-      {arg='high_threshold',type='number',
-       help='cf. low_threshold',default=1},
+             of strong edges. note that in opencv the pixels are in [0 255].
+             also note that using percent param will ignore low and high values ]], default=50},
+      {arg='high',type='number',
+       help='cf. low',default=150},
+      {arg='blursize',type='number',
+       help='Guassian blur kernel size (<1 means no blurring)', default=0},
       {arg='aperturesize',type='number',
        help='Sobel aperture size', default=3}
    )
@@ -55,13 +62,17 @@ function opencv.Canny(...)
    elseif source:size(1) ~= 1 then
       xerror(' *** ERROR: opencv.Canny works only on RBG or grey img')
    end
-   if aperturesize % 2 == 0 or aperturesize > 7 then
-      print('WARNING: aperturesize (Sobel kernel size) must be odd and not larger than 7')
-      aperturesize = math.min(aperturesize -1,7)
+   if blursize>1 and blursize % 2 == 0 then
+      print('WARNING: blursize (Guassian blur kernel size) must be odd')
+      blursize = blursize -1
+   end
+   if aperturesize % 2 == 0 or aperturesize < 1 or aperturesize > 7 then
+      print('WARNING: aperturesize (Sobel kernel size) must be odd >= 1 and <= 7')
+      aperturesize = math.max(1,math.min(aperturesize -1,7))
    end
    local dest = torch.Tensor():resizeAs(img)
-   img.libopencv.Canny(img,dest,low_threshold,high_threshold,aperturesize)
-   return dest
+   low_threshold,high_threshold = img.libopencv.Canny(img,dest,low_threshold,high_threshold,blursize,aperturesize,percent)
+   return dest,low_threshold,high_threshold
 end
 
 
@@ -534,20 +545,20 @@ opencv.TrackPyrLK
 	    help='a pair of images (2 WxHx1 tensor)', req=true},
 	   {arg='points_in',type='torch.Tensor',
 	    help='points to track', req=true},
-	   {arg='points_out',type='torch.Tensor', 
+	   {arg='points_out',type='torch.Tensor',
 	    help='tensor to return location of tracked points in output'},
 	   {arg='win_size',type='number',
 	    help='over how large of a window can the LK track', default= 25}
 	)
-        if not points_out then 
+        if not points_out then
            points_out = torch.Tensor():resizeAs(points_in):zero()
         end
 	local feature_found = torch.Tensor(points_in:size(1)):zero()
 	local feature_error = torch.Tensor(points_in:size(1)):zero()
-	pair[1].libopencv.TrackPyrLK(pair[1], pair[2], 
-                                     points_in, points_out, win_size, 
+	pair[1].libopencv.TrackPyrLK(pair[1], pair[2],
+                                     points_in, points_out, win_size,
                                      feature_found, feature_error)
-	   
+
 	return points_out, feature_found, feature_error
      end
 
