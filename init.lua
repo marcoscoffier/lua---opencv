@@ -814,18 +814,16 @@ opencv.videoForward =
       local args, videoid, tensor  = dok.unpack(
          {...},
          'opencv.videoForward',
-         [[ Grabs next frame from an open video stream ]],
+         [[ Grabs next frame from an open video stream (returns 1 at EOF)]],
          {arg='videoid', type='int', 
           help='id of video file (can have multiple open video files)',
           req=true},
          {arg='tensor', type='torch.Tensor',
-          help='tensor in which you want to store the frame'}
+          help='tensor in which you want to store the frame',
+          req=true}
       )
-      if not tensor then
-         tensor = torch.Tensor()
-      end
-      tensor.libopencv.videoGetFrame(videoid,tensor)
-      return tensor
+      
+      return tensor.libopencv.videoGetFrame(videoid,tensor)
    end
            
 opencv.video_testme = 
