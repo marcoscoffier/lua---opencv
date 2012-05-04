@@ -1207,19 +1207,21 @@ static int libopencv_(Main_cvGetFrame)(lua_State *L) {
     cidx = lua_tonumber(L,2);
   }
   /* is vid file open ? */
-  if (cidx >  fidx) {
+  if ((cidx > fidx) || (vfile[cidx] == NULL)){
     perror("no open video at index");
+    goto free_and_return;
   }
   
   frame[cidx] = cvQueryFrame ( vfile[cidx] );
 
   if ( frame[cidx] == NULL ) {
     perror("OpenCV failed to load frame");
+    goto free_and_return;
   }
 
   // return results
   libopencv_(Main_opencv8U2torch)(frame[cidx], dest);
-
+  free_and_return:
   return 0;
 }
 
@@ -1241,7 +1243,7 @@ static const luaL_reg libopencv_(Main__) [] =
   {"CalcOpticalFlow",      libopencv_(Main_cvCalcOpticalFlow)},
   {"CornerHarris",         libopencv_(Main_cvCornerHarris)},
   {"GoodFeaturesToTrack",  libopencv_(Main_cvGoodFeaturesToTrack)},
-  {"videoGetFrame",             libopencv_(Main_cvGetFrame)},
+  {"videoGetFrame",        libopencv_(Main_cvGetFrame)},
   {NULL, NULL}  /* sentinel */
 };
 

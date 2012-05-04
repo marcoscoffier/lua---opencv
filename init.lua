@@ -863,6 +863,61 @@ opencv.video_testme =
         opencv.videoCloseFile()
      end
 
+opencv.video_multi_testme = 
+   function (...)
+	local args, fname1, fname2, seekto1, seekto2, duration = dok.unpack(
+	   {...},
+	   'opencv.video_testme',
+	   [[ open video file, seek and play]],
+	   {arg='fname1', type='string',
+	    help='filename of video file', req=true},
+	   {arg='fname2', type='string',
+	    help='filename of video file', req=true},
+	   {arg='seekto1', type='float',
+	    help='position in sec (float)', default=10},
+	   {arg='seekto2', type='float',
+	    help='position in sec (float)', default=10},
+	   {arg='duration', type='float',
+	    help='number of seconds to play', default=10}
+	)
+        -- video 1
+        local vid1 = opencv.videoLoadFile(fname1)
+        print("Opened " .. fname1)
+        print(" Video id     : " .. vid1 )
+        local img1 = torch.Tensor()
+        local fps1 = opencv.videoGetFPS(vid1)
+        print(" FPS1         : " .. fps1)
+        local msec1 = opencv.videoSeek(seekto1,vid1)
+        print(" Seek request : " .. seekto1 .. "s")
+        print(" Seeked to    : " .. msec1*0.001 .."s")
+        -- video 2
+        local vid2 = opencv.videoLoadFile(fname2)
+        print("Opened " .. fname2)
+        print(" Video id     : " .. vid2 )
+        local img2 = torch.Tensor()
+        local fps2 = opencv.videoGetFPS(vid2)
+        print(" FPS2         : " .. fps2)
+        local msec2 = opencv.videoSeek(seekto2,vid2)
+        print(" Seek request : " .. seekto2 .. "s")
+        print(" Seeked to    : " .. msec2*0.001 .."s")
+        print(" Playing for  : " .. duration .. "s")
+        for i = 1,duration*fps1 do
+           opencv.videoForward(img1,vid1)
+           opencv.videoForward(img2,vid2)
+           win = image.display{image={img1, img2}, win=win}
+           if (i == 1) then
+              print(" 1st frame at : " .. 
+                    opencv.videoGetMSEC(vid1)*0.001 .."s") 
+              print(" 1st frame at : " .. 
+                    opencv.videoGetMSEC(vid2)*0.001 .."s") 
+           end
+        end
+        print(" Closing id   : " .. vid1)
+        opencv.videoCloseFile(vid1)
+        print(" Closing id   : " .. vid2)
+        opencv.videoCloseFile(vid2)
+     end
+
 function opencv.testme()
    local imgL = opencv.imgL()
    local imgR = opencv.imgR()

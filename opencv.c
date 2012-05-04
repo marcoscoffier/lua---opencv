@@ -9,37 +9,45 @@ static IplImage* frame[MAXFOPEN];
 static int fidx = 0;
 
 static int libopencv_videoLoadFile(lua_State *L) {
+  int ret = 0;
   // max file open ?
   if (fidx == MAXFOPEN) {
     perror("max nb of files open...\n");
+    ret = -1;
     goto free_and_return;
   }
-
+  
   if (lua_isstring(L, 1)) {
     const char *fname = lua_tostring(L, 1);
     printf("opening video file: %s\n", fname);
     vfile[fidx] = cvCaptureFromFile(fname);
     if( vfile[fidx] == NULL ) {
       perror("could not open: video file");
+      ret = -1;
       goto free_and_return;
     }
     frame[fidx] = cvQueryFrame ( vfile[fidx] );
 
     if ( frame[fidx] == NULL ) {
       perror("failed OpenCV to load first frame");
+      ret = -1;
       goto free_and_return; 
     }
   } else {
     // ARG error
     perror("Argument error need to pass a filename as first arg");
+    ret = -1;
     goto free_and_return; 
   }
-
-  fidx ++;
   
  free_and_return:
   /* return the id for the video just opened*/
-  lua_pushnumber(L, fidx);
+  if (ret == 0){
+    lua_pushnumber(L, fidx);
+    fidx++;
+  }else{
+    lua_pushnumber(L,-1);
+  }
   return 1;
 }
 
@@ -52,7 +60,7 @@ static int libopencv_videoCloseFile(lua_State *L) {
     cidx = lua_tonumber(L,1);
   }
   // is vid file open ?
-  if ((cidx > fidx)||(!vfile[cidx])) {
+  if ((cidx > fidx)||(vfile[cidx] == NULL)) {
     perror("no open video at index");
     goto free_and_return;
   }
@@ -83,7 +91,7 @@ static int libopencv_videoSeek(lua_State *L) {
     cidx = lua_tonumber(L,2);
   }
   // is vid file open ?
-  if ((cidx > fidx)||(!vfile[cidx])) {
+  if ((cidx > fidx)||(vfile[cidx] == NULL)) {
     perror("no open video at index");
     goto free_and_return;
   }
@@ -132,7 +140,7 @@ static int libopencv_videoDumpProperties(lua_State *L) {
     cidx = lua_tonumber(L,1);
   }
   // is vid file open ?
-  if ((cidx > fidx)||(!vfile[cidx])) {
+  if ((cidx > fidx)||(vfile[cidx] == NULL)) {
     perror("no open video at index");
     goto free_and_return;
  }
@@ -208,7 +216,7 @@ static int libopencv_videoGetProperty(lua_State *L) {
     cidx = lua_tonumber(L,2);
   }
   // is vid file open ?
-  if ((cidx > fidx)||(!vfile[cidx])) {
+  if ((cidx > fidx)||(vfile[cidx] == NULL)) {
     perror("no open video at index");
     goto free_and_return; 
   }
@@ -229,7 +237,7 @@ static int libopencv_videoGetFPS(lua_State *L) {
     cidx = lua_tonumber(L,1);
   }
   // is vid file open ?
-  if ((cidx > fidx)||(!vfile[cidx])) {
+  if ((cidx > fidx)||(vfile[cidx] == NULL)) {
     perror("no open video at index");
     goto free_and_return;
   }
@@ -250,7 +258,7 @@ static int libopencv_videoGetMSEC(lua_State *L) {
     cidx = lua_tonumber(L,1);
   }
   // is vid file open ?
-  if ((cidx > fidx)||(!vfile[cidx])) {
+  if ((cidx > fidx)||(vfile[cidx] == NULL)) {
     perror("no open video at index");
     goto free_and_return;
   }
@@ -300,5 +308,10 @@ DLL_EXPORT int luaopen_libopencv(lua_State *L)
   luaL_register(L, "libopencv.double", libopencv_DoubleMain__);
   luaL_register(L, "libopencv.float", libopencv_FloatMain__);
 
+  int i;
+  for (i=0;i<MAXFOPEN;i++){
+    vfile[i] = NULL;
+    frame[i] = NULL;
+  }
   return 1;
 }
