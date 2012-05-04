@@ -5,14 +5,26 @@
 
 #define MAXFOPEN 100
 static CvCapture* vfile[MAXFOPEN];
-static IplImage* frame[MAXFOPEN];
+static IplImage*  frame[MAXFOPEN];
+static int      nextvid[MAXFOPEN];
 static int fidx = 0;
+
+#ifdef DEBUG
+static int print_nextvid(lua_State *L){
+  int i;
+  for (i=0;i<MAXFOPEN;i++){
+    i==fidx?printf("[%02d]",nextvid[i]):printf("<%02d>",nextvid[i]);
+  }
+  printf("\n");
+  return 0;
+}
+#endif
 
 static int libopencv_videoLoadFile(lua_State *L) {
   int ret = 0;
   // max file open ?
   if (fidx == MAXFOPEN) {
-    perror("max nb of files open...\n");
+    THError("max nb of files open...");
     ret = -1;
     goto free_and_return;
   }
@@ -22,20 +34,20 @@ static int libopencv_videoLoadFile(lua_State *L) {
     printf("opening video file: %s\n", fname);
     vfile[fidx] = cvCaptureFromFile(fname);
     if( vfile[fidx] == NULL ) {
-      perror("could not open: video file");
+      THError("Could not open video file");
       ret = -1;
       goto free_and_return;
     }
     frame[fidx] = cvQueryFrame ( vfile[fidx] );
 
     if ( frame[fidx] == NULL ) {
-      perror("failed OpenCV to load first frame");
+      THError("Failed to load first frame");
       ret = -1;
       goto free_and_return; 
     }
   } else {
     // ARG error
-    perror("Argument error need to pass a filename as first arg");
+    THError("Argument error need to pass a filename as first arg");
     ret = -1;
     goto free_and_return; 
   }
@@ -44,28 +56,41 @@ static int libopencv_videoLoadFile(lua_State *L) {
   /* return the id for the video just opened*/
   if (ret == 0){
     lua_pushnumber(L, fidx);
-    fidx++;
+    fidx = nextvid[fidx];
   }else{
     lua_pushnumber(L,-1);
   }
   return 1;
 }
 
+static int fileopen(int cidx){
+  // is vid file open ?
+  if ((cidx > MAXFOPEN)||(vfile[cidx] == NULL)) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+
 /*
  * close a video file
  */
 static int libopencv_videoCloseFile(lua_State *L) {
-  int cidx = 0;
+  int cidx = MAXFOPEN;
   if (lua_isnumber(L,1)){
     cidx = lua_tonumber(L,1);
   }
   // is vid file open ?
-  if ((cidx > fidx)||(vfile[cidx] == NULL)) {
-    perror("no open video at index");
+  if (!fileopen(cidx)) {
+    THError("Can't close file: no open video at index");
     goto free_and_return;
   }
-  if (vfile[cidx]) {
+  if (vfile[cidx] != NULL) {
     cvReleaseCapture(&vfile[cidx]);
+    /* return vid so that it can be reused */
+    vfile[cidx]   = NULL;
+    nextvid[cidx] = fidx;
+    fidx          = cidx;
   }
  free_and_return: 
   return 0;
@@ -79,21 +104,22 @@ static int libopencv_videoSeek(lua_State *L) {
   double msec = 0, psec = 0;
   double sprop = 0, fps, mspf;
   int i, ret = 0;
+  int cidx = MAXFOPEN;
   if (lua_isnumber(L,1)){
-    msec = lua_tonumber(L,1) * 1000.0;
+    cidx = lua_tonumber(L,1);
+  }
+  // is vid file open ?
+  if (!fileopen(cidx)) {
+    THError("can't seek: no open video at index");
+    goto free_and_return;
+  }
+
+  if (lua_isnumber(L,2)){
+    msec = lua_tonumber(L,2) * 1000.0;
   }
   psec = msec - 500.0;
   if (psec < 0){
     psec = 0;
-  }
-  int cidx = 0;
-  if (lua_isnumber(L,2)){
-    cidx = lua_tonumber(L,2);
-  }
-  // is vid file open ?
-  if ((cidx > fidx)||(vfile[cidx] == NULL)) {
-    perror("no open video at index");
-    goto free_and_return;
   }
 
   cvSetCaptureProperty(vfile[cidx],CV_CAP_PROP_POS_MSEC,psec);
@@ -113,7 +139,7 @@ static int libopencv_videoSeek(lua_State *L) {
     /* Get new frame */
     ret = cvGrabFrame(vfile[cidx]);
     if (ret != 1){
-      perror("cvGrabFrame failed.");
+      THError("cvGrabFrame failed.");
       goto free_and_return;
     }
     /* Check current timecode */
@@ -135,15 +161,15 @@ static int libopencv_videoSeek(lua_State *L) {
  */
 static int libopencv_videoDumpProperties(lua_State *L) {
   
-  int cidx = 0;
+  int cidx = MAXFOPEN;
   if (lua_isnumber(L,1)){
     cidx = lua_tonumber(L,1);
   }
   // is vid file open ?
-  if ((cidx > fidx)||(vfile[cidx] == NULL)) {
-    perror("no open video at index");
+  if (!fileopen(cidx)) {
+    THError("Can't dump properties: no open video at index");
     goto free_and_return;
- }
+  }
 
   printf("[%d]CV_CAP_PROP_POS_MSEC: %f\n",
          CV_CAP_PROP_POS_MSEC,
@@ -207,19 +233,19 @@ static int libopencv_videoGetProperty(lua_State *L) {
   double property_val =  0;
   int    property_id  = -1;
 
+  int cidx = MAXFOPEN;
   if (lua_isnumber(L,1)){
-    property_id = lua_tonumber(L,1);
-  }
-  
-  int cidx = 0;
-  if (lua_isnumber(L,2)){
-    cidx = lua_tonumber(L,2);
+    cidx = lua_tonumber(L,1);
   }
   // is vid file open ?
-  if ((cidx > fidx)||(vfile[cidx] == NULL)) {
-    perror("no open video at index");
+  if (!fileopen(cidx)) {
+    THError("Can't get Property: no open video at index");
     goto free_and_return; 
   }
+  if (lua_isnumber(L,2)){
+    property_id = lua_tonumber(L,2);
+  }
+  
   property_val = cvGetCaptureProperty(vfile[cidx],property_id);
  free_and_return:
   lua_pushnumber(L, property_val);
@@ -232,13 +258,13 @@ static int libopencv_videoGetProperty(lua_State *L) {
 static int libopencv_videoGetFPS(lua_State *L) {
   double property_val =  0;
   
-  int cidx = 0;
+  int cidx = MAXFOPEN;
   if (lua_isnumber(L,1)){
     cidx = lua_tonumber(L,1);
   }
   // is vid file open ?
-  if ((cidx > fidx)||(vfile[cidx] == NULL)) {
-    perror("no open video at index");
+  if (!fileopen(cidx)) {
+    THError("Can't get FPS: no open video at index");
     goto free_and_return;
   }
   property_val = cvGetCaptureProperty(vfile[cidx],CV_CAP_PROP_FPS);
@@ -253,13 +279,13 @@ static int libopencv_videoGetFPS(lua_State *L) {
 static int libopencv_videoGetMSEC(lua_State *L) {
   double property_val =  0;
   
-  int cidx = 0;
+  int cidx = MAXFOPEN;
   if (lua_isnumber(L,1)){
     cidx = lua_tonumber(L,1);
   }
   // is vid file open ?
-  if ((cidx > fidx)||(vfile[cidx] == NULL)) {
-    perror("no open video at index");
+  if (!fileopen(cidx)) {
+    THError("Can't get msec: no open video at index");
     goto free_and_return;
   }
   
@@ -281,6 +307,9 @@ static const luaL_reg libopencv_init [] =
   {"videoGetFPS",         libopencv_videoGetFPS},
   {"videoGetMSEC",        libopencv_videoGetMSEC},
   {"videoDumpProperties", libopencv_videoDumpProperties},
+#ifdef DEBUG
+  {"videoPrintNextList",  print_nextvid},
+#endif
   {NULL,NULL}
 };
 
@@ -308,10 +337,12 @@ DLL_EXPORT int luaopen_libopencv(lua_State *L)
   luaL_register(L, "libopencv.double", libopencv_DoubleMain__);
   luaL_register(L, "libopencv.float", libopencv_FloatMain__);
 
+  /* set up pointers to store capture objects and frames */
   int i;
   for (i=0;i<MAXFOPEN;i++){
-    vfile[i] = NULL;
-    frame[i] = NULL;
+    vfile[i]   = NULL;
+    frame[i]   = NULL;
+    nextvid[i] = i+1;
   }
   return 1;
 }

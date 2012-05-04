@@ -811,20 +811,20 @@ end
 
 opencv.videoForward = 
    function (...)
-      local args, tensor, videoid  = dok.unpack(
+      local args, videoid, tensor  = dok.unpack(
          {...},
          'opencv.videoForward',
          [[ Grabs next frame from an open video stream ]],
-         {arg='tensor', type='torch.Tensor',
-          help='tensor in which you want to store the frame'},
          {arg='videoid', type='int', 
           help='id of video file (can have multiple open video files)',
-          default=0}
+          req=true},
+         {arg='tensor', type='torch.Tensor',
+          help='tensor in which you want to store the frame'}
       )
       if not tensor then
          tensor = torch.Tensor()
       end
-      tensor.libopencv.videoGetFrame(tensor,videoid)
+      tensor.libopencv.videoGetFrame(videoid,tensor)
       return tensor
    end
            
@@ -845,22 +845,24 @@ opencv.video_testme =
         print("Opened " .. fname)
         print(" Video id     : " .. vid )
         local img = torch.Tensor()
-        local fps = opencv.videoGetFPS()
+        local fps = opencv.videoGetFPS(vid)
         print(" FPS          : " .. fps)
-        local msec = opencv.videoSeek(seekto)
+        local msec = opencv.videoSeek(vid,seekto)
         print(" Seek request : " .. seekto .. "s")
         print(" Seeked to    : " .. msec*0.001 .."s")
         print(" Playing for  : " .. duration .. "s")
+        opencv.videoForward(vid,img)
+        local win = image.display{image=img, win=win}
         for i = 1,duration*fps do
-           opencv.videoForward(img)
+           opencv.videoForward(vid,img)
            win = image.display{image=img, win=win}
            if (i == 1) then
               print(" 1st frame at : " .. 
-                    opencv.videoGetMSEC()*0.001 .."s") 
+                    opencv.videoGetMSEC(vid)*0.001 .."s") 
            end
         end
         print(" Closing id   : " .. vid)
-        opencv.videoCloseFile()
+        opencv.videoCloseFile(vid)
      end
 
 opencv.video_multi_testme = 
@@ -887,7 +889,7 @@ opencv.video_multi_testme =
         local img1 = torch.Tensor()
         local fps1 = opencv.videoGetFPS(vid1)
         print(" FPS1         : " .. fps1)
-        local msec1 = opencv.videoSeek(seekto1,vid1)
+        local msec1 = opencv.videoSeek(vid1,seekto1)
         print(" Seek request : " .. seekto1 .. "s")
         print(" Seeked to    : " .. msec1*0.001 .."s")
         -- video 2
@@ -897,13 +899,16 @@ opencv.video_multi_testme =
         local img2 = torch.Tensor()
         local fps2 = opencv.videoGetFPS(vid2)
         print(" FPS2         : " .. fps2)
-        local msec2 = opencv.videoSeek(seekto2,vid2)
+        local msec2 = opencv.videoSeek(vid2,seekto2)
         print(" Seek request : " .. seekto2 .. "s")
         print(" Seeked to    : " .. msec2*0.001 .."s")
         print(" Playing for  : " .. duration .. "s")
+        opencv.videoForward(vid1,img1)
+        opencv.videoForward(vid2,img2)
+        local win = image.display{image={img1, img2}, win=win}
         for i = 1,duration*fps1 do
-           opencv.videoForward(img1,vid1)
-           opencv.videoForward(img2,vid2)
+           opencv.videoForward(vid1,img1)
+           opencv.videoForward(vid2,img2)
            win = image.display{image={img1, img2}, win=win}
            if (i == 1) then
               print(" 1st frame at : " .. 

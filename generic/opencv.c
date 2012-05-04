@@ -1200,25 +1200,24 @@ static int libopencv_(Main_cvFindFundamental) (lua_State *L) {
  * get frame from open video file and copy to torch tensor
  */
 static int libopencv_(Main_cvGetFrame)(lua_State *L) {
-  THTensor * dest   = luaT_checkudata(L, 1, torch_(Tensor_id));
-  /* stream defaults to 0 */
-  int cidx = 0;
-  if (lua_isnumber(L,2)){
-    cidx = lua_tonumber(L,2);
+  int cidx = MAXFOPEN;
+  if (lua_isnumber(L,1)){
+    cidx = lua_tonumber(L,1);
   }
   /* is vid file open ? */
-  if ((cidx > fidx) || (vfile[cidx] == NULL)){
-    perror("no open video at index");
+  if (!fileopen(cidx)) {
+    THError("Can't get frame: no open video at index");
     goto free_and_return;
   }
+  
+  THTensor * dest   = luaT_checkudata(L, 2, torch_(Tensor_id));
   
   frame[cidx] = cvQueryFrame ( vfile[cidx] );
 
   if ( frame[cidx] == NULL ) {
-    perror("OpenCV failed to load frame");
+    THError("Failed to load frame");
     goto free_and_return;
-  }
-
+  } 
   // return results
   libopencv_(Main_opencv8U2torch)(frame[cidx], dest);
   free_and_return:
