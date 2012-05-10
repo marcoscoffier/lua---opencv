@@ -52,9 +52,9 @@ static int libopencv_videoOpenCamera(lua_State *L) {
   if ( frame[fidx] == NULL ) {
     THError("Failed to load first frame");
     ret = -1;
-    goto free_and_return; 
+    goto free_and_return;
   }
-  
+
  free_and_return:
   /* return the id for the video just opened*/
   if (ret == 0){
@@ -74,7 +74,7 @@ static int libopencv_videoLoadFile(lua_State *L) {
     ret = -1;
     goto free_and_return;
   }
-  
+
   if (lua_isstring(L, 1)) {
     const char *fname = lua_tostring(L, 1);
     printf("opening video file: %s\n", fname);
@@ -89,15 +89,15 @@ static int libopencv_videoLoadFile(lua_State *L) {
     if ( frame[fidx] == NULL ) {
       THError("Failed to load first frame");
       ret = -1;
-      goto free_and_return; 
+      goto free_and_return;
     }
   } else {
     // ARG error
     THError("Argument error need to pass a filename as first arg");
     ret = -1;
-    goto free_and_return; 
+    goto free_and_return;
   }
-  
+
  free_and_return:
   /* return the id for the video just opened*/
   if (ret == 0){
@@ -139,7 +139,7 @@ static int libopencv_videoCloseFile(lua_State *L) {
     nextvid[cidx] = fidx;
     fidx          = cidx;
   }
- free_and_return: 
+ free_and_return:
   return 0;
 }
 
@@ -277,7 +277,7 @@ static int libopencv_videoSeek(lua_State *L) {
   sprop = cvGetCaptureProperty(vcapture[cidx],CV_CAP_PROP_POS_MSEC);
   fps   = cvGetCaptureProperty(vcapture[cidx],CV_CAP_PROP_FPS);
   mspf   = 1000/fps;
-  
+
   /* Make sure that the seek has put us before the frame we actually
      want. */
   while ((sprop > msec) && (psec > 500)){
@@ -285,7 +285,7 @@ static int libopencv_videoSeek(lua_State *L) {
     cvSetCaptureProperty(vcapture[cidx],CV_CAP_PROP_POS_MSEC,psec);
     sprop = cvGetCaptureProperty(vcapture[cidx],CV_CAP_PROP_POS_MSEC);
   }
-    
+
   for (i=0;i<fps+1;i++){
     /* Get new frame */
     ret = cvGrabFrame(vcapture[cidx]);
@@ -296,11 +296,11 @@ static int libopencv_videoSeek(lua_State *L) {
     /* Check current timecode */
     sprop = cvGetCaptureProperty(vcapture[cidx],CV_CAP_PROP_POS_MSEC);
     if (sprop + mspf > msec){
-      /* Found the correct frame. */ 
+      /* Found the correct frame. */
       break;
     } /* if (sprop > msec) */
   } /* for (i=0;i<fps+1,i++) */
-  
+
  free_and_return:
   /* return the actual msec of the frame found */
   lua_pushnumber(L, sprop);
@@ -311,7 +311,7 @@ static int libopencv_videoSeek(lua_State *L) {
  * dump video properties
  */
 static int libopencv_videoDumpProperties(lua_State *L) {
-  
+
   int cidx = MAXFOPEN;
   if (lua_isnumber(L,1)){
     cidx = lua_tonumber(L,1);
@@ -391,12 +391,11 @@ static int libopencv_videoGetProperty(lua_State *L) {
   // is vid file open ?
   if (!fileopen(cidx)) {
     THError("Can't get Property: no open video at index");
-    goto free_and_return; 
+    goto free_and_return;
   }
   if (lua_isnumber(L,2)){
     property_id = lua_tonumber(L,2);
   }
-  
   property_val = cvGetCaptureProperty(vcapture[cidx],property_id);
  free_and_return:
   lua_pushnumber(L, property_val);
@@ -408,7 +407,7 @@ static int libopencv_videoGetProperty(lua_State *L) {
  */
 static int libopencv_videoGetFPS(lua_State *L) {
   double property_val =  0;
-  
+
   int cidx = MAXFOPEN;
   if (lua_isnumber(L,1)){
     cidx = lua_tonumber(L,1);
@@ -429,7 +428,7 @@ static int libopencv_videoGetFPS(lua_State *L) {
  */
 static int libopencv_videoGetMSEC(lua_State *L) {
   double property_val =  0;
-  
+
   int cidx = MAXFOPEN;
   if (lua_isnumber(L,1)){
     cidx = lua_tonumber(L,1);
@@ -439,7 +438,6 @@ static int libopencv_videoGetMSEC(lua_State *L) {
     THError("Can't get msec: no open video at index");
     goto free_and_return;
   }
-  
   property_val = cvGetCaptureProperty(vcapture[cidx],CV_CAP_PROP_POS_MSEC);
  free_and_return:
   lua_pushnumber(L, property_val);
@@ -481,7 +479,7 @@ DLL_EXPORT int luaopen_libopencv(lua_State *L)
 {
 
   luaL_register(L, "opencv", libopencv_init);
-  
+
   torch_FloatTensor_id = luaT_checktypename2id(L, "torch.FloatTensor");
   torch_DoubleTensor_id = luaT_checktypename2id(L, "torch.DoubleTensor");
 
