@@ -50,14 +50,18 @@ static void libopencv_(Main_opencvMat2torch)(CvMat *source, THTensor *dest) {
   double * data_64Fp;
   uchar * data_8U;
   uchar * data_8Up;
+  char * data_8S;
+  char * data_8Sp;
   unsigned int * data_16U;
   unsigned int * data_16Up;
+  short * data_16S;
+  short * data_16Sp;
   switch (CV_MAT_DEPTH(source->type))
     {
     case CV_32F:
       cvGetRawData(source, (uchar**)&data_32F, &mat_step, &mat_size);
       // Resize target
-      THTensor_(resize2d)(dest, source->rows, source->cols);
+      THTensor_(resize3d)(dest, 1, source->rows, source->cols);
       tensor = THTensor_(newContiguous)(dest);
       data_32Fp = data_32F;
       // copy
@@ -71,7 +75,7 @@ static void libopencv_(Main_opencvMat2torch)(CvMat *source, THTensor *dest) {
     case CV_64F:
       cvGetRawData(source, (uchar**)&data_64F, &mat_step, &mat_size);
       // Resize target
-      THTensor_(resize2d)(dest, source->rows, source->cols);
+      THTensor_(resize3d)(dest, 1, source->rows, source->cols);
       tensor = THTensor_(newContiguous)(dest);
 
       data_64Fp = data_64F;
@@ -86,7 +90,7 @@ static void libopencv_(Main_opencvMat2torch)(CvMat *source, THTensor *dest) {
     case CV_8U:
       cvGetRawData(source, (uchar**)&data_8U, &mat_step, &mat_size);
       // Resize target
-      THTensor_(resize2d)(dest, source->rows, source->cols);
+      THTensor_(resize3d)(dest, 1, source->rows, source->cols);
       tensor = THTensor_(newContiguous)(dest);
 
       data_8Up = data_8U;
@@ -98,10 +102,25 @@ static void libopencv_(Main_opencvMat2torch)(CvMat *source, THTensor *dest) {
                       );
       THTensor_(free)(tensor);
       break;
+    case CV_8S:
+      cvGetRawData(source, (uchar**)&data_8S, &mat_step, &mat_size);
+      // Resize target
+      THTensor_(resize3d)(dest, 1, source->rows, source->cols);
+      tensor = THTensor_(newContiguous)(dest);
+
+      data_8Sp = data_8S;
+      // copy
+      TH_TENSOR_APPLY(real, tensor,
+                      *tensor_data = ((real)(*data_8Sp));
+                      // step through channels of ipl
+                      data_8Sp++;
+                      );
+      THTensor_(free)(tensor);
+      break;
     case CV_16U:
       cvGetRawData(source, (uchar**)&data_16U, &mat_step, &mat_size);
       // Resize target
-      THTensor_(resize2d)(dest, source->rows, source->cols);
+      THTensor_(resize3d)(dest, 1, source->rows, source->cols);
       tensor = THTensor_(newContiguous)(dest);
 
       data_16Up = data_16U;
@@ -110,6 +129,21 @@ static void libopencv_(Main_opencvMat2torch)(CvMat *source, THTensor *dest) {
                       *tensor_data = ((real)(*data_16Up));
                       // step through channels of ipl
                       data_16Up++;
+                      );
+      THTensor_(free)(tensor);
+      break;
+    case CV_16S:
+      cvGetRawData(source, (uchar**)&data_16S, &mat_step, &mat_size);
+      // Resize target
+      THTensor_(resize3d)(dest, 1, source->rows, source->cols);
+      tensor = THTensor_(newContiguous)(dest);
+
+      data_16Sp = data_16S;
+      // copy
+      TH_TENSOR_APPLY(real, tensor,
+                      *tensor_data = ((real)(*data_16Sp));
+                      // step through channels of ipl
+                      data_16Sp++;
                       );
       THTensor_(free)(tensor);
       break;
@@ -1161,12 +1195,108 @@ static int libopencv_(Main_cvFindFundamental) (lua_State *L) {
   return 0;
 }
 
+/*
+ * Computes the disparity map using block matching algorithm.
+ */
+static int libopencv_(Main_cvFindStereoCorrespondenceBM) (lua_State *L) {
+  // Get Tensor's Info
+  THTensor * left = luaT_checkudata(L, 1, torch_(Tensor_id));
+  IplImage * left_ipl = libopencv_(Main_torchimg2opencv_8U)(left);
+  THTensor * right = luaT_checkudata(L, 2, torch_(Tensor_id));
+  IplImage * right_ipl = libopencv_(Main_torchimg2opencv_8U)(right);
+  THTensor * dest = luaT_checkudata(L, 3, torch_(Tensor_id));
+  // Create ipl image for result
+  CvSize depth_size = cvSize(left->size[2], left->size[1]);
+  IplImage * depth_ipl = cvCreateImage(depth_size, IPL_DEPTH_32F,1);
+
+  // params
+  int minDisparity = luaL_checkint(L,4);
+  int numberOfDisparities = luaL_checkint(L,5);
+  int textureThreshold = luaL_checkint(L,6);
+  CvStereoBMState *BMState = cvCreateStereoBMState(CV_STEREO_BM_BASIC,0);
+  /* BMState->preFilterSize 		= 5; */
+  /* BMState->preFilterCap 		= 63; */
+  /* BMState->SADWindowSize 		= 5; */
+  BMState->minDisparity = minDisparity;
+  BMState->numberOfDisparities 	= numberOfDisparities;
+  BMState->textureThreshold = textureThreshold;
+  /* BMState->uniquenessRatio 	= 0; */
+  /* BMState->speckleWindowSize 	= 0; */
+  /* BMState->speckleRange		= 0; */
+
+  // compute
+  cvFindStereoCorrespondenceBM (left_ipl,right_ipl,depth_ipl,BMState);
+
+  // rescale to pixel unit
+  cvConvertScale( depth_ipl, depth_ipl, 16, 0 );
+  // copy into dest
+  libopencv_(Main_opencv32F2torch)(depth_ipl,dest);
+
+  // free stuff
+  cvReleaseStereoBMState( &BMState );
+  cvReleaseImage(&left_ipl);
+  cvReleaseImage(&right_ipl);
+  cvReleaseImage(&depth_ipl);
+  return 0;
+}
+
+/*
+ * Computes the disparity map using graph cut algorithm.
+ */
+static int libopencv_(Main_cvFindStereoCorrespondenceGC) (lua_State *L) {
+  // Get Tensor's Info
+  THTensor * left = luaT_checkudata(L, 1, torch_(Tensor_id));
+  IplImage * left_ipl = libopencv_(Main_torchimg2opencv_8U)(left);
+  THTensor * right = luaT_checkudata(L, 2, torch_(Tensor_id));
+  IplImage * right_ipl = libopencv_(Main_torchimg2opencv_8U)(right);
+  THTensor * Ldisp = luaT_checkudata(L, 3, torch_(Tensor_id));
+  THTensor * Rdisp = luaT_checkudata(L, 4, torch_(Tensor_id));
+
+  // Create maps for result
+  CvSize size = cvSize(left->size[2], left->size[1]);
+  CvMat* disparity_left = cvCreateMat( size.height, size.width, CV_16S );
+  CvMat* disparity_right = cvCreateMat( size.height, size.width, CV_16S );
+
+  // params
+  int maxIters = luaL_checkint(L,5);
+  int numberOfDisparities = luaL_checkint(L,6);
+  CvStereoGCState* state = cvCreateStereoGCState( numberOfDisparities, maxIters );
+  /* state->minDisparity = 0; */
+  /* state->numberOfDisparities = numberOfDisparities; */
+  /* state->maxIters = maxIters <= 0 ? 3 : maxIters; */
+  /* state->Ithreshold = 5; */
+  /* state->interactionRadius = 1; */
+  /* state->K = state->lambda = state->lambda1 = state->lambda2 = -1.f; */
+  /* state->occlusionCost = OCCLUSION_PENALTY; */
+
+
+  // compute
+  cvFindStereoCorrespondenceGC(left_ipl, right_ipl,
+                               disparity_left, disparity_right, state, 0);
+
+  // rescale to pixel unit
+  cvConvertScale( disparity_left, disparity_left, -16, 0 );
+  cvConvertScale( disparity_right, disparity_right, 16, 0 );
+  // copy into dest
+  libopencv_(Main_opencvMat2torch)(disparity_left,Ldisp);
+  libopencv_(Main_opencvMat2torch)(disparity_right,Rdisp);
+
+  // free stuff
+  cvReleaseStereoGCState( &state );
+  cvReleaseImage(&left_ipl);
+  cvReleaseImage(&right_ipl);
+  cvReleaseMat(&disparity_left);
+  cvReleaseMat(&disparity_right);
+  return 0;
+}
 
 //============================================================
 // Register functions in LUA
 //
 static const luaL_reg libopencv_(Main__) [] =
 {
+  {"StereoCorrespondenceBM",libopencv_(Main_cvFindStereoCorrespondenceBM)},
+  {"StereoCorrespondenceGC",libopencv_(Main_cvFindStereoCorrespondenceGC)},
   {"FindFundamental",      libopencv_(Main_cvFindFundamental)},
   {"GetAffineTransform",   libopencv_(Main_cvGetAffineTransform)},
   {"WarpAffine",           libopencv_(Main_cvWarpAffine)},

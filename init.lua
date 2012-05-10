@@ -30,11 +30,99 @@ opencv = {}
 -- load C lib
 require 'libopencv'
 
+function opencv.StereoCorrespondenceBM(...)
+   local _, left, right, minDisparity, numberOfDisparities, textureThreshold = dok.unpack(
+      {...},
+      'opencv.StereoCorrespondenceBM',
+      [[Implements opencv StereoCorrespondenceBM using block matching algorithm
+            return Tensor of computed disparities]],
+      {arg='left', type='torch.Tensor',
+       help='single channel left image', req=true},
+      {arg='right', type='torch.Tensor',
+       help='single channel right image', req=true},
+      {arg='minDisparity',type='number',
+       help='minimum disparity', default=1},
+      {arg='numberOfDisparities',type='number',
+       help='maximum disparity - minimum disparity must be a multiple of 16', default=64},
+      {arg='textureThreshold',type='number',
+       help='areas with no texture are ignored', default=10}
+   )
+   -- check left
+   local leftImg = torch.Tensor(left)
+   if left:nDimension() == 2 then
+      leftImg = leftImg:resize(1,left:size(1),left:size(2))
+   elseif leftImg:nDimension() == 3 and leftImg:size(1) == 3
+   then
+      leftImg=image.rgb2y(left)
+   elseif leftImg:size(1) ~= 1 then
+      xerror([[ *** ERROR: opencv.StereoCorrespondenceBM
+                   left img must be RBG or grey scale]])
+   end
+   -- check right
+   local rightImg = torch.Tensor(right)
+   if right:nDimension() == 2 then
+      rightImg = rightImg:resize(1,right:size(1),right:size(2))
+   elseif rightImg:nDimension() == 3 and rightImg:size(1) == 3
+   then
+      rightImg=image.rgb2y(right)
+   elseif rightImg:size(1) ~= 1 then
+      xerror([[ *** ERROR: opencv.StereoCorrespondenceBM
+                   right img must be RBG or grey scale]])
+   end
+   local dest = torch.Tensor()
+   libopencv.double.StereoCorrespondenceBM(leftImg,rightImg,dest,
+                                           minDisparity, numberOfDisparities,
+                                           textureThreshold)
+   return dest
+   end
+
+function opencv.StereoCorrespondenceGC(...)
+   local _, left, right, maxIters, numberOfDisparities = dok.unpack(
+      {...},
+      'opencv.StereoCorrespondenceGC',
+      [[Implements opencv StereoCorrespondenceBM using block matching algorithm
+            return left disparities, right disparities]],
+      {arg='left', type='torch.Tensor',
+       help='single channel left image', req=true},
+      {arg='right', type='torch.Tensor',
+       help='single channel right image', req=true},
+      {arg='maxIters',type='number',
+       help='maximum # of iterations', default=2},
+      {arg='numberOfDisparities',type='number',
+       help='maximum disparity - minimum disparity must be a multiple of 16', default=16}
+   )
+   -- check left
+   local leftImg = torch.Tensor(left)
+   if left:nDimension() == 2 then
+      leftImg = leftImg:resize(1,left:size(1),left:size(2))
+   elseif leftImg:nDimension() == 3 and leftImg:size(1) == 3
+   then
+      leftImg=image.rgb2y(left)
+   elseif leftImg:size(1) ~= 1 then
+      xerror([[ *** ERROR: opencv.StereoCorrespondenceGC
+                   left img must be RBG or grey scale]])
+   end
+   -- check right
+   local rightImg = torch.Tensor(right)
+   if right:nDimension() == 2 then
+      rightImg = rightImg:resize(1,right:size(1),right:size(2))
+   elseif rightImg:nDimension() == 3 and rightImg:size(1) == 3
+   then
+      rightImg=image.rgb2y(right)
+   elseif rightImg:size(1) ~= 1 then
+      xerror([[ *** ERROR: opencv.StereoCorrespondenceGC
+                   right img must be RBG or grey scale]])
+   end
+   local Ldisp = torch.Tensor()
+   local Rdisp = torch.Tensor()
+   libopencv.double.StereoCorrespondenceGC(leftImg,rightImg,Ldisp,Rdisp,
+                                           maxIters, numberOfDisparities)
+   return Ldisp,Rdisp
+end
 
 -- Canny
 function opencv.Canny(...)
    local _, source, percent, low_threshold, high_threshold, blursize, aperturesize = dok.unpack(
-      --local _, source, low_threshold, high_threshold, aperturesize = dok.unpack(
       {...},
       'opencv.Canny',
       [[Implements the Canny algorithm for edge detection.
