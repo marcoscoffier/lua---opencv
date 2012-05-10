@@ -825,6 +825,34 @@ opencv.videoForward =
       
       return tensor.libopencv.videoGetFrame(videoid,tensor)
    end
+
+opencv.camera_testme = 
+   function (...)
+	local args, idx, duration = dok.unpack(
+	   {...},
+	   'opencv.camera_testme',
+	   [[ open camera device and play]],
+	   {arg='idx', type='int',
+	    help='device id', default=-1},
+	   {arg='duration', type='int',
+	    help='number of frames to capture', default=100}
+	)
+        local vid = opencv.videoOpenCamera(idx)
+        print("Opened " .. idx)
+        print(" Video id     : " .. vid )
+        local img = torch.Tensor()
+        print(" Playing for  : " .. duration .. " frames")
+        opencv.videoForward(vid,img)
+        local win = image.display{image=img, win=win}
+        for i = 1,duration do
+           sys.tic()
+           opencv.videoForward(vid,img)
+           win = image.display{image=img, win=win}
+           print("FPS: "..1/sys.toc())
+        end
+        print(" Closing id   : " .. vid)
+        opencv.videoCloseFile(vid)
+     end
            
 opencv.video_testme = 
    function (...)

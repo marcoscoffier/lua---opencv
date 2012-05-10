@@ -20,6 +20,45 @@ static int print_nextvid(lua_State *L){
 }
 #endif
 
+static int libopencv_videoOpenCamera(lua_State *L) {
+  int ret = 0;
+  // max file open ?
+  if (fidx == MAXFOPEN) {
+    THError("max nb of devices open...");
+    ret = -1;
+    goto free_and_return;
+  }
+  int idx = -1;
+  if (lua_isnumber(L, 1)) {
+    idx = lua_tonumber(L, 1);
+    printf("opening camera device: %d\n", idx);
+  }
+  vfile[fidx] = cvCaptureFromCAM(idx);
+  if( vfile[fidx] == NULL ) {
+    THError("Could not open video file");
+    ret = -1;
+    goto free_and_return;
+  }
+
+  frame[fidx] = cvQueryFrame ( vfile[fidx] );
+
+  if ( frame[fidx] == NULL ) {
+    THError("Failed to load first frame");
+    ret = -1;
+    goto free_and_return; 
+  }
+  
+ free_and_return:
+  /* return the id for the video just opened*/
+  if (ret == 0){
+    lua_pushnumber(L, fidx);
+    fidx = nextvid[fidx];
+  }else{
+    lua_pushnumber(L,-1);
+  }
+  return 1;
+}
+
 static int libopencv_videoLoadFile(lua_State *L) {
   int ret = 0;
   // max file open ?
@@ -301,6 +340,7 @@ static int libopencv_videoGetMSEC(lua_State *L) {
 static const luaL_reg libopencv_init [] =
 {
   {"videoLoadFile",       libopencv_videoLoadFile},
+  {"videoOpenCamera",     libopencv_videoOpenCamera},
   {"videoCloseFile",      libopencv_videoCloseFile},
   {"videoSeek",           libopencv_videoSeek},
   {"videoGetProperty",    libopencv_videoGetProperty},
