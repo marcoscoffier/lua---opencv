@@ -1214,16 +1214,48 @@ static int libopencv_(Main_cvGetFrame)(lua_State *L) {
   
   THTensor * dest   = luaT_checkudata(L, 2, torch_(Tensor_id));
   
-  frame[cidx] = cvQueryFrame ( vfile[cidx] );
+  frame[cidx] = cvQueryFrame ( vcapture[cidx] );
 
   if ( frame[cidx] == NULL ) {
-    fprintf(stderr,"Failed to load frame, perhaps EOF");
+    fprintf(stderr,"Failed to load frame, perhaps EOF\n");
     ret = 0;
     goto free_and_return;
   } 
   // return results
   libopencv_(Main_opencv8U2torch)(frame[cidx], dest);
   free_and_return:
+  lua_pushnumber(L, ret); 
+  return 1;
+}
+
+/*
+ * write frame from torch tensor to open video file
+ */
+static int libopencv_(Main_cvWriteFrame)(lua_State *L) {
+  int ret = 1;
+  int cidx = MAXWOPEN;
+  IplImage *frame_ipl;  
+  if (lua_isnumber(L,1)){
+    cidx = lua_tonumber(L,1);
+  }
+  /* is vid file open ? */
+  if (!writeropen(cidx)) {
+    THError("Can't save frame: no open video at index");
+    ret = 0;
+    goto free_and_return;
+  }
+  THTensor * dest   = luaT_checkudata(L, 2, torch_(Tensor_id));
+  frame_ipl = libopencv_(Main_torchimg2opencv_8U)(dest);
+  ret = cvWriteFrame ( vwriter[cidx], frame_ipl);
+  if ( ret < 1 ) {
+    fprintf(stderr,"Failed to load frame, perhaps EOF\n");
+    ret = 0;
+    goto free_and_return;
+  } 
+  // return results
+
+ free_and_return:
+  cvReleaseImageHeader(&frame_ipl);
   lua_pushnumber(L, ret); 
   return 1;
 }
@@ -1247,6 +1279,7 @@ static const luaL_reg libopencv_(Main__) [] =
   {"CornerHarris",         libopencv_(Main_cvCornerHarris)},
   {"GoodFeaturesToTrack",  libopencv_(Main_cvGoodFeaturesToTrack)},
   {"videoGetFrame",        libopencv_(Main_cvGetFrame)},
+  {"videoWriteFrame",      libopencv_(Main_cvWriteFrame)},
   {NULL, NULL}  /* sentinel */
 };
 

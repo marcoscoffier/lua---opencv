@@ -826,6 +826,24 @@ opencv.videoForward =
       return tensor.libopencv.videoGetFrame(videoid,tensor)
    end
 
+opencv.videoWriteFrame = 
+   function (...)
+      local args, videoid, tensor  = dok.unpack(
+         {...},
+         'opencv.videoWriteFrame',
+         [[ writes frame to an open video writer (returns 1 at EOF)]],
+         {arg='videoid', type='int', 
+          help='id of video writer (can have multiple open video writers)',
+          req=true},
+         {arg='tensor', type='torch.Tensor',
+          help='tensor which you want to write',
+          req=true}
+      )
+      
+      return tensor.libopencv.videoWriteFrame(videoid,tensor)
+   end
+
+
 opencv.camera_testme = 
    function (...)
 	local args, idx, duration = dok.unpack(
@@ -889,6 +907,61 @@ opencv.video_testme =
            end
         end
         print(" Closing id   : " .. vid)
+        opencv.videoCloseFile(vid)
+     end
+
+opencv.videowriter_testme = 
+   function (...)
+      local args, finput, foutput, seekto, duration = dok.unpack(
+         {...},
+         'opencv.videowriter_testme',
+         [[ open video file, seek and write frames to another video ]],
+         {arg='finput', type='string',
+          help='filename of video input file', req=true},
+         {arg='foutput', type='string',
+          help='filename of video output file', default="out.avi"},
+         {arg='fourcc', type='string',
+          help='fourcc for video output file', default="mjpg"},
+         {arg='seekto', type='float',
+	    help='position in sec (float)', default=10},
+	   {arg='duration', type='float',
+	    help='number of seconds to play', default=1}
+	)
+        local vid = opencv.videoLoadFile(finput)
+        print("Opened " .. finput)
+        print(" Video id     : " .. vid )
+        local img = torch.Tensor()
+        local fps = opencv.videoGetFPS(vid)
+        print(" FPS          : " .. fps)
+        local msec = opencv.videoSeek(vid,seekto)
+        print(" Seek request : " .. seekto .. "s")
+        print(" Seeked to    : " .. msec*0.001 .."s")
+        opencv.videoForward(vid,img)
+        local width = img:size(3)
+        local height = img:size(2)
+        print(" Frame in size : "..width.."x"..height)
+        local imgs = image.scale(img,width,height)
+        local wrt = 
+           opencv.videoWriter(foutput,width,height,fps)
+        print("Opened " .. foutput)
+        print(" Writer id     : " .. wrt )
+        opencv.videoWriteFrame(wrt,imgs)
+        local win = image.display{image=img, win=win}
+        print(" Playing for  : " .. duration .. "s")
+        for i = 1,duration*fps do
+           sys.tic()
+           opencv.videoForward(vid,img)
+           win = image.display{image=img, win=win}
+           opencv.videoWriteFrame(wrt,img)
+           if (i == 1) then
+              print(" 1st frame at : " .. 
+                    opencv.videoGetMSEC(vid)*0.001 .."s") 
+           end
+           print("FPS: "..1/sys.toc())
+        end
+        print(" Closing writer   : " .. wrt)
+        opencv.videoCloseWriter(wrt)
+        print(" Closing id       : " .. vid)
         opencv.videoCloseFile(vid)
      end
 
