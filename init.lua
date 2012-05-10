@@ -1000,7 +1000,7 @@ opencv.video_testme =
 
 opencv.videowriter_testme = 
    function (...)
-      local args, finput, foutput, seekto, duration = dok.unpack(
+      local args, finput, foutput, fourcc, seekto, duration = dok.unpack(
          {...},
          'opencv.videowriter_testme',
          [[ open video file, seek and write frames to another video ]],
@@ -1030,7 +1030,7 @@ opencv.videowriter_testme =
         print(" Frame in size : "..width.."x"..height)
         local imgs = image.scale(img,width,height)
         local wrt = 
-           opencv.videoWriter(foutput,width,height,fps)
+           opencv.videoWriter(foutput,width,height,fps,fourcc)
         print("Opened " .. foutput)
         print(" Writer id     : " .. wrt )
         opencv.videoWriteFrame(wrt,imgs)
