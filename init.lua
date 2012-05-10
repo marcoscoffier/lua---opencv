@@ -840,6 +840,7 @@ opencv.camera_testme =
         local vid = opencv.videoOpenCamera(idx)
         print("Opened " .. idx)
         print(" Video id     : " .. vid )
+        opencv.videoDumpProperties(vid)
         local img = torch.Tensor()
         print(" Playing for  : " .. duration .. " frames")
         opencv.videoForward(vid,img)
