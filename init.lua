@@ -657,7 +657,7 @@ opencv.drawFlowlinesOnImage
 	   'opencv.drawFlowlinesOnImage',
 	   [[ utility to visualize sparse flows ]],
 	   {arg='pair', type='table',
-	    help='a pair of point tensors (2 nPointsx2 tensor)', req=true},
+	    help='a pair of point tensors (2 nPointsx(2 or 3) tensor)', req=true},
 	   {arg='image', type='torch.Tensor',
 	    help='image on which to draw the flowlines', req=true},
 	   {arg='color', type='torch.Tensor',
@@ -665,6 +665,7 @@ opencv.drawFlowlinesOnImage
 	   {arg='mask', type='torch.Tensor',
 	    help='mask tensor 1D npoints 0 when not to draw point'}
 	)
+        -- default color is red
 	if not color then
 	   color = torch.Tensor(3):zero()
 	   color[1] = 255
@@ -672,6 +673,31 @@ opencv.drawFlowlinesOnImage
 	pair[1].libopencv.drawFlowlinesOnImage(pair[1],pair[2],image,color,mask)
      end
 
+opencv.circlePoints
+   = function (...)
+	local args, points, image, color, size = dok.unpack(
+	   {...},
+	   'opencv.circlePoints',
+	   [[ draw circles around interest points ]],
+	   {arg='points', type='torch.Tensor',
+	    help='a point tensor (nPointsx(2or3) tensor)', req=true},
+	   {arg='image', type='torch.Tensor',
+	    help='image on which to draw the circles', req=true},
+	   {arg='color', type='torch.Tensor',
+	    help='color of flow line eg. R = [255,0,0]'},
+	   {arg='size', type='number',
+	    help='size of the circles to draw'}
+	)
+        -- default color is red
+	if not color then
+	   color = torch.Tensor(3):zero()
+	   color[1] = 255
+	end
+        if not size then
+           size = 10
+        end
+	points.libopencv.circlePoints(points,image,color,size)
+     end
 
 function opencv.TrackPyrLK_testme(imgL,imgR)
    if not imgL then
@@ -870,6 +896,147 @@ function opencv.getExtrinsicsFromEssential_testme(imgL,imgR)
    print("time to get extrinsics from essential: ",sys.toc())
 
 end
+
+opencv.videoForward =
+   function (...)
+      local args, videoid, tensor  = dok.unpack(
+         {...},
+         'opencv.videoForward',
+         [[ Grabs next frame from an open video stream (returns 1 at EOF)]],
+         {arg='videoid', type='int',
+          help='id of video file (can have multiple open video files)',
+          req=true},
+         {arg='tensor', type='torch.Tensor',
+          help='tensor in which you want to store the frame',
+          req=true}
+      )
+
+      return tensor.libopencv.videoGetFrame(videoid,tensor)
+   end
+
+opencv.camera_testme =
+   function (...)
+	local args, idx, duration = dok.unpack(
+	   {...},
+	   'opencv.camera_testme',
+	   [[ open camera device and play]],
+	   {arg='idx', type='int',
+	    help='device id', default=-1},
+	   {arg='duration', type='int',
+	    help='number of frames to capture', default=100}
+	)
+        local vid = opencv.videoOpenCamera(idx)
+        print("Opened " .. idx)
+        print(" Video id     : " .. vid )
+        opencv.videoDumpProperties(vid)
+        local img = torch.Tensor()
+        print(" Playing for  : " .. duration .. " frames")
+        opencv.videoForward(vid,img)
+        local win = image.display{image=img, win=win}
+        for i = 1,duration do
+           sys.tic()
+           opencv.videoForward(vid,img)
+           win = image.display{image=img, win=win}
+           print("FPS: "..1/sys.toc())
+        end
+        print(" Closing id   : " .. vid)
+        opencv.videoCloseFile(vid)
+     end
+
+opencv.video_testme =
+   function (...)
+	local args, fname, seekto, duration = dok.unpack(
+	   {...},
+	   'opencv.video_testme',
+	   [[ open video file, seek and play]],
+	   {arg='fname', type='string',
+	    help='filename of video file', req=true},
+	   {arg='seekto', type='float',
+	    help='position in sec (float)', default=10},
+	   {arg='duration', type='float',
+	    help='number of seconds to play', default=10}
+	)
+        local vid = opencv.videoLoadFile(fname)
+        print("Opened " .. fname)
+        print(" Video id     : " .. vid )
+        local img = torch.Tensor()
+        local fps = opencv.videoGetFPS(vid)
+        print(" FPS          : " .. fps)
+        local msec = opencv.videoSeek(vid,seekto)
+        print(" Seek request : " .. seekto .. "s")
+        print(" Seeked to    : " .. msec*0.001 .."s")
+        print(" Playing for  : " .. duration .. "s")
+        opencv.videoForward(vid,img)
+        local win = image.display{image=img, win=win}
+        for i = 1,duration*fps do
+           opencv.videoForward(vid,img)
+           win = image.display{image=img, win=win}
+           if (i == 1) then
+              print(" 1st frame at : " ..
+                    opencv.videoGetMSEC(vid)*0.001 .."s")
+           end
+        end
+        print(" Closing id   : " .. vid)
+        opencv.videoCloseFile(vid)
+     end
+
+opencv.video_multi_testme =
+   function (...)
+	local args, fname1, fname2, seekto1, seekto2, duration = dok.unpack(
+	   {...},
+	   'opencv.video_testme',
+	   [[ open video file, seek and play]],
+	   {arg='fname1', type='string',
+	    help='filename of video file', req=true},
+	   {arg='fname2', type='string',
+	    help='filename of video file', req=true},
+	   {arg='seekto1', type='float',
+	    help='position in sec (float)', default=10},
+	   {arg='seekto2', type='float',
+	    help='position in sec (float)', default=10},
+	   {arg='duration', type='float',
+	    help='number of seconds to play', default=10}
+	)
+        -- video 1
+        local vid1 = opencv.videoLoadFile(fname1)
+        print("Opened " .. fname1)
+        print(" Video id     : " .. vid1 )
+        local img1 = torch.Tensor()
+        local fps1 = opencv.videoGetFPS(vid1)
+        print(" FPS1         : " .. fps1)
+        local msec1 = opencv.videoSeek(vid1,seekto1)
+        print(" Seek request : " .. seekto1 .. "s")
+        print(" Seeked to    : " .. msec1*0.001 .."s")
+        -- video 2
+        local vid2 = opencv.videoLoadFile(fname2)
+        print("Opened " .. fname2)
+        print(" Video id     : " .. vid2 )
+        local img2 = torch.Tensor()
+        local fps2 = opencv.videoGetFPS(vid2)
+        print(" FPS2         : " .. fps2)
+        local msec2 = opencv.videoSeek(vid2,seekto2)
+        print(" Seek request : " .. seekto2 .. "s")
+        print(" Seeked to    : " .. msec2*0.001 .."s")
+        print(" Playing for  : " .. duration .. "s")
+        opencv.videoForward(vid1,img1)
+        opencv.videoForward(vid2,img2)
+        local win = image.display{image={img1, img2}, win=win}
+        for i = 1,duration*fps1 do
+           opencv.videoForward(vid1,img1)
+           opencv.videoForward(vid2,img2)
+           win = image.display{image={img1, img2}, win=win}
+           if (i == 1) then
+              print(" 1st frame at : " ..
+                    opencv.videoGetMSEC(vid1)*0.001 .."s")
+              print(" 1st frame at : " ..
+                    opencv.videoGetMSEC(vid2)*0.001 .."s")
+           end
+        end
+        print(" Closing id   : " .. vid1)
+        opencv.videoCloseFile(vid1)
+        print(" Closing id   : " .. vid2)
+        opencv.videoCloseFile(vid2)
+     end
 
 function opencv.testme()
    local imgL = opencv.imgL()

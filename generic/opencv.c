@@ -320,15 +320,21 @@ static void libopencv_(Main_opencvPoints2torch)(CvPoint2D32f * points, int npoin
 static CvPoint2D32f * libopencv_(Main_torch2opencvPoints)(THTensor *src) {
 
   int count = src->size[0];
+  int dims  = src->size[1];
   // create output
   CvPoint2D32f * points_cv = NULL;
   points_cv = (CvPoint2D32f*)cvAlloc(count*sizeof(points_cv[0]));
   real * src_pt = THTensor_(data)(src);
   // copy
-  int p;
+  int p,q;
   for (p=0; p<count; p++){
     points_cv[p].x = (float)*src_pt++ ;
     points_cv[p].y = (float)*src_pt++ ;
+    if (dims > 2) {
+      for (q=2 ; q<dims ; q++){
+        src_pt++;
+      }
+    }
   }
 
   // return freshly created CvPoint2D32f
@@ -615,12 +621,12 @@ static int libopencv_(Main_cvCalcOpticalFlowPyrLK) (lua_State *L) {
 			 quality, min_distance, 0, 3, 0, 0.04 );
   printf("got good features for points1\n");
   /*
-  cvFindCornerSubPix( grey1, points1_cv, count,
-		      cvSize(win_size,win_size),
-		      cvSize(-1,-1),
-		      cvTermCriteria(CV_TERMCRIT_ITER|CV_TERMCRIT_EPS,
-				     20,0.03));
-  printf("Found SubPixel\n");
+    cvFindCornerSubPix( grey1, points1_cv, count,
+    cvSize(win_size,win_size),
+    cvSize(-1,-1),
+    cvTermCriteria(CV_TERMCRIT_ITER|CV_TERMCRIT_EPS,
+    20,0.03));
+    printf("Found SubPixel\n");
   */
   // Call Lucas Kanade algorithm
   char features_found[ count ];
@@ -759,6 +765,35 @@ static int libopencv_(Main_cvTrackPyrLK) (lua_State *L) {
 
   return 0;
 }
+
+
+//============================================================
+// draws circles around points to (for visualizing interest points)
+static int libopencv_(Main_cvCirclePoints) (lua_State *L) {
+  THTensor * points  = luaT_checkudata(L,1, torch_(Tensor_id));
+  THTensor * image   = luaT_checkudata(L,2, torch_(Tensor_id));
+  THTensor * color   = luaT_checkudata(L,3, torch_(Tensor_id));
+  int size = 10;
+  if (lua_isnumber(L, 4)) size = lua_tonumber(L, 4);
+
+  IplImage * image_ipl = libopencv_(Main_torchimg2opencv_8U)(image);
+  CvScalar color_cv  = CV_RGB(THTensor_(get1d)(color,0),
+                              THTensor_(get1d)(color,1),
+                              THTensor_(get1d)(color,2));
+  int count = points->size[0];
+  CvPoint2D32f* points_cv = libopencv_(Main_torch2opencvPoints)(points);
+
+  int i;
+  for( i = 0; i < count; i++ ) {
+    cvCircle(image_ipl, cvPointFrom32f(points_cv[i]), size, color_cv, 1, 8,0);
+  }
+
+  // return results
+  libopencv_(Main_opencv8U2torch)(image_ipl, image);
+  cvReleaseImage( &image_ipl );
+  return 0;
+}
+
 
 //============================================================
 // draws red flow lines on an image (for visualizing the flow)
@@ -977,7 +1012,7 @@ static int libopencv_(Main_cvCanny) (lua_State *L) {
       cvReleaseImage(&drv);
       cvReleaseImage(&drv32f);
       // compute histogram
-      #define NB_BINS 64
+#define NB_BINS 64
       int nbBins = NB_BINS;
       CvHistogram *hist;
       cvMinMaxLoc(mag,&vmin,&vmax,NULL,NULL,NULL);
@@ -1196,6 +1231,39 @@ static int libopencv_(Main_cvFindFundamental) (lua_State *L) {
 }
 
 /*
+ * get frame from open video file and copy to torch tensor
+ */
+static int libopencv_(Main_cvGetFrame)(lua_State *L) {
+  int ret = 1;
+  int cidx = MAXFOPEN;
+  if (lua_isnumber(L,1)){
+    cidx = lua_tonumber(L,1);
+  }
+  /* is vid file open ? */
+  if (!fileopen(cidx)) {
+    THError("Can't get frame: no open video at index");
+    ret = 0;
+    goto free_and_return;
+  }
+
+  THTensor * dest   = luaT_checkudata(L, 2, torch_(Tensor_id));
+
+  frame[cidx] = cvQueryFrame ( vfile[cidx] );
+
+  if ( frame[cidx] == NULL ) {
+    fprintf(stderr,"Failed to load frame, perhaps EOF");
+    ret = 0;
+    goto free_and_return;
+  }
+  // return results
+  libopencv_(Main_opencv8U2torch)(frame[cidx], dest);
+ free_and_return:
+  lua_pushnumber(L, ret);
+  return 1;
+}
+
+
+/*
  * Computes the disparity map using block matching algorithm.
  */
 static int libopencv_(Main_cvFindStereoCorrespondenceBM) (lua_State *L) {
@@ -1304,11 +1372,13 @@ static const luaL_reg libopencv_(Main__) [] =
   {"Canny",                libopencv_(Main_cvCanny)},
   {"smoothVoronoi",        libopencv_(Main_smoothVoronoi)},
   {"drawFlowlinesOnImage", libopencv_(Main_cvDrawFlowlinesOnImage)},
+  {"circlePoints",         libopencv_(Main_cvCirclePoints)},
   {"TrackPyrLK",           libopencv_(Main_cvTrackPyrLK)},
   {"CalcOpticalFlowPyrLK", libopencv_(Main_cvCalcOpticalFlowPyrLK)},
   {"CalcOpticalFlow",      libopencv_(Main_cvCalcOpticalFlow)},
   {"CornerHarris",         libopencv_(Main_cvCornerHarris)},
   {"GoodFeaturesToTrack",  libopencv_(Main_cvGoodFeaturesToTrack)},
+  {"videoGetFrame",        libopencv_(Main_cvGetFrame)},
   {NULL, NULL}  /* sentinel */
 };
 
