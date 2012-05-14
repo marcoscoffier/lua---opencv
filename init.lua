@@ -464,6 +464,61 @@ function opencv.CalcOpticalFlow(...)
    end
 end
 
+function opencv.display(...)
+   local args = {}
+   xlua.unpack_class(args, {...}, 'opencv.display',
+      'displays a single image, with optional parameters',
+      {arg='image', type='torch.Tensor | table',
+       help='image or table of images 3xHxW', req=true},
+      {arg='min', type='number', help='lower-bound for range', default=nil},
+      {arg='max', type='number', help='upper-bound for range', default=nil},
+      {arg='win', type='string', help='window legend (and descriptor)', default=nil}
+   )
+   
+   function cloneImg(src, dst)
+      if src:size(1) == 1 then
+	 src = src[1]
+      end
+      if src:nDimension() == 2 then
+	 dst[1]:copy(src)
+	 dst[2]:copy(src)
+	 dst[3]:copy(src)
+      else
+	 dst:copy(src)
+      end
+   end
+   local image
+   if type(args.image) == 'table' then
+      local n = #args.image
+      local h = args.image[1]:size(2)
+      local w = args.image[1]:size(3)
+      image = torch.Tensor(3, h, n*w)
+      for i = 1,n do
+	 cloneImg(args.image[i], image:narrow(3, (i-1)*w+1, w))
+      end
+   else
+      cloneImg(args.image, image)
+   end
+   
+   if not args.min then args.min = image:min() end
+   if not args.max then args.max = image:max() end
+   image:add(-args.min)
+   image:div(args.max-args.min)
+
+   opencv.windownames = opencv.windownames or {}
+   if not args.win then
+      local i = 1
+      while opencv.windownames[string.format("window %d", i)] do
+	 i = i + 1
+      end
+      args.win = string.format("window %d", i)
+      opencv.windownames[args.win] = true
+   end
+   
+   image.libopencv.display(image, args.win)
+   return args.win
+end
+
 -- testers:
 function opencv.CalcOpticalFlow_testme(img1, img2)
    local img1 = img1

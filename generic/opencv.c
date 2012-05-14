@@ -1389,6 +1389,18 @@ static int libopencv_(Main_cvFindStereoCorrespondenceGC) (lua_State *L) {
   return 0;
 }
 
+static int libopencv_(Display)(lua_State* L) {
+  THTensor * image    = luaT_checkudata(L, 1, torch_(Tensor_id));
+  IplImage * image_cv = libopencv_(Main_torchimg2opencv_8U)(image);
+  const char* win     = lua_tostring(L, 2);
+
+  cvNamedWindow(win, CV_WINDOW_AUTOSIZE);
+  cvShowImage(win, image_cv);
+
+  cvReleaseImage(&image_cv);
+  return 0;
+}
+
 //============================================================
 // Register functions in LUA
 //
@@ -1411,6 +1423,7 @@ static const luaL_reg libopencv_(Main__) [] =
   {"GoodFeaturesToTrack",  libopencv_(Main_cvGoodFeaturesToTrack)},
   {"videoGetFrame",        libopencv_(Main_cvGetFrame)},
   {"videoWriteFrame",      libopencv_(Main_cvWriteFrame)},
+  {"display",              libopencv_(Display)},
   {NULL, NULL}  /* sentinel */
 };
 
