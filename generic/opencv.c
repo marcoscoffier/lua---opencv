@@ -35,6 +35,7 @@
 
 #include <cv.h>
 #include <highgui.h>
+#include "opencv_backcomp.hpp"
 
 #define CV_NO_BACKWARD_COMPATIBILITY
 
