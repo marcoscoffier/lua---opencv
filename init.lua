@@ -682,8 +682,15 @@ opencv.TrackPyrLK
 	local args, pair, points_in, points_out, win_size  = dok.unpack(
 	   {...},
 	   'opencv.TrackPyrLK',
-	   [[Runs pyramidal Lucas-Kanade, on two input images and a set of
-                 points which are meant to be tracked ]],
+	   [[
+Runs pyramidal Lucas-Kanade, on two input images and a set of
+points which are meant to be tracked.  
+
+Returns 3 tensors:
+ - points : the npoints x 2 list of matching points in the second image
+ - feature_found : binary npoints whether the feature was found
+ - feature_error : how close the found feature matches original
+           ]],
 	   {arg='pair', type='table',
 	    help='a pair of images (2 WxHx1 tensor)', req=true},
 	   {arg='points_in',type='torch.Tensor',
