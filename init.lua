@@ -497,6 +497,15 @@ function opencv.display(...)
 	 cloneImg(args.image[i], image:narrow(3, (i-1)*w+1, w))
       end
    else
+      local h, w
+      if args.image:nDimension() == 2 then
+	 h = args.image:size(1)
+	 w = args.image:size(2)
+      else
+	 h = args.image:size(2)
+	 w = args.image:size(3)
+      end
+      image = torch.Tensor(3, h, w)
       cloneImg(args.image, image)
    end
    
