@@ -691,8 +691,15 @@ opencv.TrackPyrLK
 	local args, pair, points_in, points_out, win_size  = dok.unpack(
 	   {...},
 	   'opencv.TrackPyrLK',
-	   [[Runs pyramidal Lucas-Kanade, on two input images and a set of
-                 points which are meant to be tracked ]],
+	   [[
+Runs pyramidal Lucas-Kanade, on two input images and a set of
+points which are meant to be tracked.  
+
+Returns 3 tensors:
+ - points : the npoints x 2 list of matching points in the second image
+ - feature_found : binary npoints whether the feature was found
+ - feature_error : how close the found feature matches original
+           ]],
 	   {arg='pair', type='table',
 	    help='a pair of images (2 WxHx1 tensor)', req=true},
 	   {arg='points_in',type='torch.Tensor',
@@ -966,16 +973,18 @@ opencv.videoForward =
       local args, videoid, tensor  = dok.unpack(
          {...},
          'opencv.videoForward',
-         [[ Grabs next frame from an open video stream (returns 1 at EOF)]],
+         [[ Grabs next frame from an open video stream (returns 0 at EOF)]],
          {arg='videoid', type='int',
           help='id of video file (can have multiple open video files)',
           req=true},
          {arg='tensor', type='torch.Tensor',
-          help='tensor in which you want to store the frame',
-          req=true}
+          help='tensor in which you want to store the frame'}
       )
-
-      return tensor.libopencv.videoGetFrame(videoid,tensor)
+      if not tensor then
+         tensor=torch.Tensor()
+      end
+      local ret = tensor.libopencv.videoGetFrame(videoid,tensor)
+      return tensor, ret
    end
 
 opencv.videoWriteFrame = 
@@ -1041,22 +1050,27 @@ opencv.video_testme =
         local vid = opencv.videoLoadFile(fname)
         print("Opened " .. fname)
         print(" Video id     : " .. vid )
-        local img = torch.Tensor()
         local fps = opencv.videoGetFPS(vid)
         print(" FPS          : " .. fps)
         local msec = opencv.videoSeek(vid,seekto)
         print(" Seek request : " .. seekto .. "s")
         print(" Seeked to    : " .. msec*0.001 .."s")
         print(" Playing for  : " .. duration .. "s")
-        opencv.videoForward(vid,img)
+        local img,ret = opencv.videoForward(vid)           
         local win = image.display{image=img, win=win}
         for i = 1,duration*fps do
-           opencv.videoForward(vid,img)
-           win = image.display{image=img, win=win}
-           if (i == 1) then
-              print(" 1st frame at : " ..
-                    opencv.videoGetMSEC(vid)*0.001 .."s")
+           sys.tic()
+           img, ret = opencv.videoForward(vid,img)
+           if (ret<1) then
+              break;
+           else
+              win = image.display{image=img, win=win}
+              if (i == 1) then
+                 print(" 1st frame at : " ..
+                       opencv.videoGetMSEC(vid)*0.001 .."s")
+              end
            end
+           print("Frame[",i,"] FPS: ", 1/sys.toc())
         end
         print(" Closing id   : " .. vid)
         opencv.videoCloseFile(vid)
