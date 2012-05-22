@@ -553,12 +553,10 @@ function opencv.CalcOpticalFlow_testme(img1, img2)
       hsl:select(1,3):fill(0.5)
       local rgb = image.hsl2rgb(hsl)
       image.display{image={img1,img2,rgb},
-		    legend='cvOpticalFLow, method = ' .. method,
-		    legends={'input 1', 'input2', 'HSL-mapped flow'}}
+		    legend='cvOpticalFLow, method = ' .. method}
       image.display{image={norm,angle,flow_x,flow_y},
                     scaleeach=true,
-		    legend='cvOpticalFLow, method = ' .. method,
-		    legends={'norm','angle', 'flow x', 'flow y'}}
+		    legend='cvOpticalFLow, method = ' .. method}
    end
 end
 
@@ -793,9 +791,6 @@ function opencv.TrackPyrLK_testme(imgL,imgR)
    local ptsout = opencv.TrackPyrLK{pair={imgL,imgR},points_in=ptsin}
    opencv.drawFlowlinesOnImage({ptsin,ptsout},imgR)
    image.display{image={imgL,imgR},
-		 legends={'previous image',
-			  'current image w/ flowlines',
-			  'Optical Flow Pyramidal LK Tracking'},
 		 legend='opencv: Optical Flow Pyramidal LK Tracking',
 		 win_w=imgL:size(1)*2,win_h=imgL:size(2)}
 end
@@ -818,9 +813,6 @@ function opencv.TrackPyrLK_wmask_testme(imgL,imgR,mask)
    local ptsout = opencv.TrackPyrLK{pair={imgL,imgR},points_in=ptsin}
    opencv.drawFlowlinesOnImage({ptsin,ptsout},imgR)
    image.display{image={imgL,imgR},
-		 legends={'previous image',
-			  'current image w/ flowlines',
-			  'Optical Flow Pyramidal LK Tracking'},
 		 legend='opencv: Optical Flow Pyramidal LK Tracking',
 		 win_w=imgL:size(1)*2,win_h=imgL:size(2)}
 end
