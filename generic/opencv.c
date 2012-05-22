@@ -300,6 +300,33 @@ static IplImage * libopencv_(Main_torchimg2opencv_32F)(THTensor *source) {
   return dest;
 }
 
+static IplImage * libopencv_(Main_torchmask2opencv)(THTensor *source) {
+  // Pointers
+  uchar * mask_data;
+  CvSize mask_size = cvSize(source->size[1], source->size[0]);
+
+  // Create ipl image
+  IplImage *mask = cvCreateImage(mask_size, IPL_DEPTH_8U, 1);
+  // get pointer to raw data
+  cvGetRawData(mask, (uchar**)&mask_data, NULL, NULL);
+
+  // copy
+  THTensor *tensor  = THTensor_(newContiguous)(source);  
+  uchar    *maskp   = mask_data;
+  // copy
+  TH_TENSOR_APPLY(real, tensor,
+                  *maskp = *tensor_data == 0?0:1;
+                  // step through ipl
+                  maskp++;
+                  );
+
+  // free
+  THTensor_(free)(tensor);
+
+  // return freshly created IPL image
+  return mask;
+}
+
 static void libopencv_(Main_opencvPoints2torch)(CvPoint2D32f * points, int npoints, THTensor *tensor) {
 
   // Resize target
@@ -514,10 +541,10 @@ static int libopencv_(Main_cvGoodFeaturesToTrack) (lua_State *L) {
   THTensor * image     = luaT_checkudata(L, 1, torch_(Tensor_id));
   THTensor * points    = luaT_checkudata(L, 2, torch_(Tensor_id));
 
-  CvSize dest_size         = cvSize(image->size[2], image->size[1]);
-  IplImage * image_ipl     = libopencv_(Main_torchimg2opencv_8U)(image);
+  CvSize dest_size     = cvSize(image->size[2], image->size[1]);
+  IplImage * image_ipl = libopencv_(Main_torchimg2opencv_8U)(image);
 
-  IplImage * grey = cvCreateImage( dest_size, 8, 1 );
+  IplImage * grey      = cvCreateImage( dest_size, 8, 1 );
 
   cvCvtColor( image_ipl, grey, CV_BGR2GRAY );
   CvPoint2D32f* points_cv = 0;
@@ -543,22 +570,27 @@ static int libopencv_(Main_cvGoodFeaturesToTrack) (lua_State *L) {
   if (lua_isnumber(L, 6)) {
     blocksize = lua_tonumber(L, 6);
   }
-
+  THTensor *mask = luaT_toudata(L,7,torch_(Tensor_id));
+  IplImage *maskMat = NULL;
+  if(mask != NULL){
+    maskMat = libopencv_(Main_torchmask2opencv)(mask);
+  }
   points_cv = (CvPoint2D32f*)cvAlloc(count*sizeof(points_cv[0]));
 
   cvGoodFeaturesToTrack( grey, eig, temp, points_cv, &count,
-			 quality, min_distance, NULL, blocksize, 0, 0.04 );
+			 quality, min_distance, maskMat, blocksize,
+                         0, 0.04 );
 
   // return results
   libopencv_(Main_opencvPoints2torch)(points_cv, count, points);
 
   // Deallocate points_cv
-  cvFree(&points_cv);
+  cvFree(         &points_cv);
   cvReleaseImage( &eig );
   cvReleaseImage( &temp );
   cvReleaseImage( &grey );
   cvReleaseImage( &image_ipl );
-
+  cvReleaseImage( &maskMat );
   return 0;
 }
 

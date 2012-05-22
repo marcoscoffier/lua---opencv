@@ -565,19 +565,29 @@ end
 -- GoodFeaturesToTrack
 opencv.GoodFeaturesToTrack
    = function(...)
-	local args, image, count, quality, min_distance, win_size  =
+	local args, image, count, quality, min_distance, win_size, mask  =
 	   dok.unpack(
 	   {...},
 	   'opencv.GoodFeaturesToTrack',
 	   [[
-		 Computes the GoodFeatures algorithm of opencv.
-   		    + returns a points tensor of the sub-pixel positions of the features
-		    and a copy of the input image with yellow circles around the interest points ]],
-	   {arg='image', type='torch.Tensor', help='image in which to detect Good Feature points',req=true},
-	   {arg='count',type='number', help='number of points to return', default=500},
-	   {arg='quality',type='number', help='quality', default=0.01},
-	   {arg='min_distance',type='number', help='min spatial distance (in pixels) between returned feature points', default=10},
-	   {arg='win_size',type='number', help='window size over which to run heuristics', default=10}
+ Computes the GoodFeatures algorithm of opencv.
+
+   + returns a points tensor (npoints x 2) of the pixel positions 
+     (x,y in image space) of the features.
+
+]],
+	   {arg='image', type='torch.Tensor', 
+            help='image in which to detect Good Feature points',req=true},
+	   {arg='count',type='number', 
+            help='number of points to return', default=500},
+	   {arg='quality',type='number', 
+            help='quality', default=0.01},
+	   {arg='min_distance',type='number', 
+            help='min spatial distance (in pixels) between returned feature points', default=10},
+	   {arg='win_size',type='number', 
+            help='window size over which to run heuristics', default=10},
+           {arg='mask', type='torch.Tensor', 
+            help="a tensor of 0 and 1s which specifies a region of the image on which to run the goodfeatures",default=nil}
 	)
 	local img = image
 	local points = torch.Tensor(2,count)
@@ -586,7 +596,8 @@ opencv.GoodFeaturesToTrack
                                           count,
                                           quality,
                                           min_distance,
-                                          win_size)
+                                          win_size,
+                                          mask)
 	return points
      end
 
@@ -611,7 +622,7 @@ opencv.CalcOpticalFlowPyrLK
 	   [[
 Computes the Pyramidal Lucas-Kanade optical flow algorithm of opencv.
   + input two images
-  + returns a points tensor of the sub-pixel positions of the features
+  + returns a points tensor of the pixel positions of the features
 and a copy of the input image with red lines indicating the flow from
 the interest points
            ]],
@@ -778,6 +789,31 @@ function opencv.TrackPyrLK_testme(imgL,imgR)
       imgR = opencv.imgR()
    end
    local ptsin = opencv.GoodFeaturesToTrack{image=imgL,count=imgL:nElement()}
+
+   local ptsout = opencv.TrackPyrLK{pair={imgL,imgR},points_in=ptsin}
+   opencv.drawFlowlinesOnImage({ptsin,ptsout},imgR)
+   image.display{image={imgL,imgR},
+		 legends={'previous image',
+			  'current image w/ flowlines',
+			  'Optical Flow Pyramidal LK Tracking'},
+		 legend='opencv: Optical Flow Pyramidal LK Tracking',
+		 win_w=imgL:size(1)*2,win_h=imgL:size(2)}
+end
+
+function opencv.TrackPyrLK_wmask_testme(imgL,imgR,mask)
+   if not imgL then
+      imgL = opencv.imgL()
+   end
+   if not imgR then
+      imgR = opencv.imgR()
+   end
+   if not mask then
+      mask = torch.Tensor(imgL:size(2),imgL:size(3)):fill(0)
+      mask:narrow(1,200,200):narrow(2,100,250):fill(1)
+   end
+   local ptsin = opencv.GoodFeaturesToTrack{image=imgL,
+                                            count=imgL:nElement(),
+                                            mask=mask}
 
    local ptsout = opencv.TrackPyrLK{pair={imgL,imgR},points_in=ptsin}
    opencv.drawFlowlinesOnImage({ptsin,ptsout},imgR)
