@@ -829,6 +829,50 @@ static int libopencv_(Main_cvCirclePoints) (lua_State *L) {
 
 
 //============================================================
+// draws polygon through points
+static int libopencv_(Main_cvFillPoly) (lua_State *L) {
+  THTensor * points  = luaT_checkudata(L,1, torch_(Tensor_id));
+  THTensor * image   = luaT_checkudata(L,2, torch_(Tensor_id));
+  THTensor * color   = luaT_checkudata(L,3, torch_(Tensor_id));
+  real     * pointsd = THTensor_(data)(points);
+  
+  CvPoint  * outline;
+  int        ncurves = 1;
+  CvPoint  * curve_arr[1];
+  int        ncurve_pts[1];
+  int i;
+  
+  IplImage * image_ipl = libopencv_(Main_torchimg2opencv_8U)(image);
+  CvScalar color_cv  =
+    cvScalar(THTensor_(get1d)(color,2),
+             THTensor_(get1d)(color,1),
+             THTensor_(get1d)(color,0),
+             (color->size[0] > 3)? THTensor_(get1d)(color,3): 255);
+  int count = points->size[0];
+  
+  outline = (CvPoint*)cvAlloc(count*sizeof(CvPoint));
+
+   /*
+   * Create the polygon outline which opencv can use. */
+  curve_arr[0]  = outline;
+  ncurve_pts[0] = count;
+  for (i = 0; i < count; i++) {
+    outline[i].x = *pointsd++;
+    outline[i].y = *pointsd++;
+  } /* for (i) */
+    /*
+     * Draw the polygon. */
+  cvFillPoly(image_ipl, curve_arr, ncurve_pts, ncurves, color_cv, 8, 0);
+ 
+  // return results
+  libopencv_(Main_opencv8U2torch)(image_ipl, image);
+  cvReleaseImage( &image_ipl );
+  cvFree( &outline );
+  return 0;
+}
+
+
+//============================================================
 // draws red flow lines on an image (for visualizing the flow)
 static int libopencv_(Main_cvDrawFlowlinesOnImage) (lua_State *L) {
   THTensor * points1 = luaT_checkudata(L,1, torch_(Tensor_id));
@@ -1448,6 +1492,7 @@ static const luaL_reg libopencv_(Main__) [] =
   {"smoothVoronoi",        libopencv_(Main_smoothVoronoi)},
   {"drawFlowlinesOnImage", libopencv_(Main_cvDrawFlowlinesOnImage)},
   {"circlePoints",         libopencv_(Main_cvCirclePoints)},
+  {"fillPoly",             libopencv_(Main_cvFillPoly)},
   {"TrackPyrLK",           libopencv_(Main_cvTrackPyrLK)},
   {"CalcOpticalFlowPyrLK", libopencv_(Main_cvCalcOpticalFlowPyrLK)},
   {"CalcOpticalFlow",      libopencv_(Main_cvCalcOpticalFlow)},

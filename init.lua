@@ -779,6 +779,27 @@ opencv.circlePoints
 	points.libopencv.circlePoints(points,image,color,size)
      end
 
+opencv.fillPoly
+   = function (...)
+	local args, points, image, color, size = dok.unpack(
+	   {...},
+	   'opencv.fillPoly',
+	   [[ draw filled polygon on an image ]],
+	   {arg='points', type='torch.Tensor',
+	    help='a point tensor (nPointsx(2) tensor)', req=true},
+	   {arg='image', type='torch.Tensor',
+	    help='image on which to draw the circles', req=true},
+	   {arg='color', type='torch.Tensor',
+	    help='color of fill eg. RGB = [255,0,0] or RGBA = [255,255,255,50]'}
+	)
+        -- default color is red
+	if not color then
+	   color = torch.Tensor(3):zero()
+	   color[1] = 255
+	end
+	points.libopencv.fillPoly(points,image,color)
+     end
+
 function opencv.TrackPyrLK_testme(imgL,imgR)
    if not imgL then
       imgL = opencv.imgL()
