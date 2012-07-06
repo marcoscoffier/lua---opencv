@@ -830,10 +830,11 @@ static int libopencv_(Main_cvCirclePoints) (lua_State *L) {
 
 //============================================================
 // draws polygon through points
-static int libopencv_(Main_cvFillPoly) (lua_State *L) {
+static int libopencv_(Main_cvDrawPoly) (lua_State *L) {
   THTensor * points  = luaT_checkudata(L,1, torch_(Tensor_id));
   THTensor * image   = luaT_checkudata(L,2, torch_(Tensor_id));
-  THTensor * color   = luaT_checkudata(L,3, torch_(Tensor_id));
+  int fill           = lua_tonumber(L,3); 
+  THTensor * color   = luaT_checkudata(L,4, torch_(Tensor_id));
   real     * pointsd = THTensor_(data)(points);
   
   CvPoint  * outline;
@@ -862,8 +863,13 @@ static int libopencv_(Main_cvFillPoly) (lua_State *L) {
   } /* for (i) */
     /*
      * Draw the polygon. */
-  cvFillPoly(image_ipl, curve_arr, ncurve_pts, ncurves, color_cv, 8, 0);
- 
+  if (fill == 0){
+    cvPolyLine(image_ipl, curve_arr,
+               ncurve_pts, ncurves, 1, color_cv, 1, 8, 0);
+  } else {
+    cvFillPoly(image_ipl, curve_arr,
+               ncurve_pts, ncurves, color_cv, 8, 0);
+  }
   // return results
   libopencv_(Main_opencv8U2torch)(image_ipl, image);
   cvReleaseImage( &image_ipl );
@@ -1492,7 +1498,7 @@ static const luaL_reg libopencv_(Main__) [] =
   {"smoothVoronoi",        libopencv_(Main_smoothVoronoi)},
   {"drawFlowlinesOnImage", libopencv_(Main_cvDrawFlowlinesOnImage)},
   {"circlePoints",         libopencv_(Main_cvCirclePoints)},
-  {"fillPoly",             libopencv_(Main_cvFillPoly)},
+  {"drawPoly",             libopencv_(Main_cvDrawPoly)},
   {"TrackPyrLK",           libopencv_(Main_cvTrackPyrLK)},
   {"CalcOpticalFlowPyrLK", libopencv_(Main_cvCalcOpticalFlowPyrLK)},
   {"CalcOpticalFlow",      libopencv_(Main_cvCalcOpticalFlow)},
