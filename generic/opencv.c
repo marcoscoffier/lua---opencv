@@ -373,8 +373,8 @@ static CvPoint2D32f * libopencv_(Main_torch2opencvPoints)(THTensor *src) {
 //============================================================
 static int libopencv_(Main_cvCornerHarris) (lua_State *L) {
   // Get Tensor's Info
-  THTensor * image  = luaT_checkudata(L, 1, torch_(Tensor_id));
-  THTensor * harris = luaT_checkudata(L, 2, torch_(Tensor_id));
+  THTensor * image  = luaT_checkudata(L, 1, torch_Tensor);
+  THTensor * harris = luaT_checkudata(L, 2, torch_Tensor);
 
   if (image->size[0] > 1){
     printf("WARNING: CorverHarris only accepts single channel images\n");
@@ -418,10 +418,10 @@ static int libopencv_(Main_cvCornerHarris) (lua_State *L) {
 //
 static int libopencv_(Main_cvCalcOpticalFlow)(lua_State *L) {
   // Get Tensor's Info
-  THTensor * curr = luaT_checkudata(L, 1, torch_(Tensor_id));
-  THTensor * prev = luaT_checkudata(L, 2, torch_(Tensor_id));
-  THTensor * velx = luaT_checkudata(L, 3, torch_(Tensor_id));
-  THTensor * vely = luaT_checkudata(L, 4, torch_(Tensor_id));
+  THTensor * curr = luaT_checkudata(L, 1, torch_Tensor);
+  THTensor * prev = luaT_checkudata(L, 2, torch_Tensor);
+  THTensor * velx = luaT_checkudata(L, 3, torch_Tensor);
+  THTensor * vely = luaT_checkudata(L, 4, torch_Tensor);
 
   // Generate IPL images
   IplImage * curr_ipl = libopencv_(Main_torchimg2opencv_8U)(curr);
@@ -538,8 +538,8 @@ static int libopencv_(Main_cvCalcOpticalFlow)(lua_State *L) {
 //============================================================
 static int libopencv_(Main_cvGoodFeaturesToTrack) (lua_State *L) {
   // Get Tensor's Info
-  THTensor * image     = luaT_checkudata(L, 1, torch_(Tensor_id));
-  THTensor * points    = luaT_checkudata(L, 2, torch_(Tensor_id));
+  THTensor * image     = luaT_checkudata(L, 1, torch_Tensor);
+  THTensor * points    = luaT_checkudata(L, 2, torch_Tensor);
 
   CvSize dest_size     = cvSize(image->size[2], image->size[1]);
   IplImage * image_ipl = libopencv_(Main_torchimg2opencv_8U)(image);
@@ -570,7 +570,7 @@ static int libopencv_(Main_cvGoodFeaturesToTrack) (lua_State *L) {
   if (lua_isnumber(L, 6)) {
     blocksize = lua_tonumber(L, 6);
   }
-  THTensor *mask = luaT_toudata(L,7,torch_(Tensor_id));
+  THTensor *mask = luaT_toudata(L,7,torch_Tensor);
   IplImage *maskMat = NULL;
   if(mask != NULL){
     maskMat = libopencv_(Main_torchmask2opencv)(mask);
@@ -597,12 +597,12 @@ static int libopencv_(Main_cvGoodFeaturesToTrack) (lua_State *L) {
 //============================================================
 static int libopencv_(Main_cvCalcOpticalFlowPyrLK) (lua_State *L) {
   // Get Tensor's Info
-  THTensor * image1 = luaT_checkudata(L, 1, torch_(Tensor_id));
-  THTensor * image2 = luaT_checkudata(L, 2, torch_(Tensor_id));
-  THTensor * flow_x = luaT_checkudata(L, 3, torch_(Tensor_id));
-  THTensor * flow_y = luaT_checkudata(L, 4, torch_(Tensor_id));
-  THTensor * points = luaT_checkudata(L, 5, torch_(Tensor_id));
-  THTensor * image_out = luaT_checkudata(L, 6, torch_(Tensor_id));
+  THTensor * image1 = luaT_checkudata(L, 1, torch_Tensor);
+  THTensor * image2 = luaT_checkudata(L, 2, torch_Tensor);
+  THTensor * flow_x = luaT_checkudata(L, 3, torch_Tensor);
+  THTensor * flow_y = luaT_checkudata(L, 4, torch_Tensor);
+  THTensor * points = luaT_checkudata(L, 5, torch_Tensor);
+  THTensor * image_out = luaT_checkudata(L, 6, torch_Tensor);
 
   printf("Parsed args\n");
   int count = 500;
@@ -718,10 +718,10 @@ static int libopencv_(Main_cvCalcOpticalFlowPyrLK) (lua_State *L) {
 //============================================================
 static int libopencv_(Main_cvTrackPyrLK) (lua_State *L) {
   // Get Tensor's Info
-  THTensor * image1  = luaT_checkudata(L, 1, torch_(Tensor_id));
-  THTensor * image2  = luaT_checkudata(L, 2, torch_(Tensor_id));
-  THTensor * points1 = luaT_checkudata(L, 3, torch_(Tensor_id));
-  THTensor * points2 = luaT_checkudata(L, 4, torch_(Tensor_id));
+  THTensor * image1  = luaT_checkudata(L, 1, torch_Tensor);
+  THTensor * image2  = luaT_checkudata(L, 2, torch_Tensor);
+  THTensor * points1 = luaT_checkudata(L, 3, torch_Tensor);
+  THTensor * points2 = luaT_checkudata(L, 4, torch_Tensor);
   THTensor * ff = 0;
   THTensor * fe = 0;
 
@@ -734,11 +734,11 @@ static int libopencv_(Main_cvTrackPyrLK) (lua_State *L) {
   }
 
   if (!lua_isnil(L,6)) {
-    ff = luaT_checkudata(L,6,torch_(Tensor_id));
+    ff = luaT_checkudata(L,6,torch_Tensor);
     THTensor_(resize1d)(ff,count);
   }
   if (!lua_isnil(L,7)) {
-    fe = luaT_checkudata(L,7,torch_(Tensor_id));
+    fe = luaT_checkudata(L,7,torch_Tensor);
     THTensor_(resize1d)(fe,count);
   }
 
@@ -803,9 +803,9 @@ static int libopencv_(Main_cvTrackPyrLK) (lua_State *L) {
 //============================================================
 // draws circles around points to (for visualizing interest points)
 static int libopencv_(Main_cvCirclePoints) (lua_State *L) {
-  THTensor * points  = luaT_checkudata(L,1, torch_(Tensor_id));
-  THTensor * image   = luaT_checkudata(L,2, torch_(Tensor_id));
-  THTensor * color   = luaT_checkudata(L,3, torch_(Tensor_id));
+  THTensor * points  = luaT_checkudata(L,1, torch_Tensor);
+  THTensor * image   = luaT_checkudata(L,2, torch_Tensor);
+  THTensor * color   = luaT_checkudata(L,3, torch_Tensor);
   int size = 10;
   if (lua_isnumber(L, 4)) size = lua_tonumber(L, 4);
 
@@ -831,10 +831,10 @@ static int libopencv_(Main_cvCirclePoints) (lua_State *L) {
 //============================================================
 // draws polygon through points
 static int libopencv_(Main_cvDrawPoly) (lua_State *L) {
-  THTensor * points  = luaT_checkudata(L,1, torch_(Tensor_id));
-  THTensor * image   = luaT_checkudata(L,2, torch_(Tensor_id));
+  THTensor * points  = luaT_checkudata(L,1, torch_Tensor);
+  THTensor * image   = luaT_checkudata(L,2, torch_Tensor);
   int fill           = lua_tonumber(L,3); 
-  THTensor * color   = luaT_checkudata(L,4, torch_(Tensor_id));
+  THTensor * color   = luaT_checkudata(L,4, torch_Tensor);
   real     * pointsd = THTensor_(data)(points);
   
   CvPoint  * outline;
@@ -881,15 +881,15 @@ static int libopencv_(Main_cvDrawPoly) (lua_State *L) {
 //============================================================
 // draws red flow lines on an image (for visualizing the flow)
 static int libopencv_(Main_cvDrawFlowlinesOnImage) (lua_State *L) {
-  THTensor * points1 = luaT_checkudata(L,1, torch_(Tensor_id));
-  THTensor * points2 = luaT_checkudata(L,2, torch_(Tensor_id));
-  THTensor * image   = luaT_checkudata(L,3, torch_(Tensor_id));
-  THTensor * color   = luaT_checkudata(L,4, torch_(Tensor_id));
+  THTensor * points1 = luaT_checkudata(L,1, torch_Tensor);
+  THTensor * points2 = luaT_checkudata(L,2, torch_Tensor);
+  THTensor * image   = luaT_checkudata(L,3, torch_Tensor);
+  THTensor * color   = luaT_checkudata(L,4, torch_Tensor);
   THTensor * mask    = NULL;
   int usemask = 0;
   if (!lua_isnil(L,5)){
     usemask = 1;
-    mask = luaT_checkudata(L,5, torch_(Tensor_id));
+    mask = luaT_checkudata(L,5, torch_Tensor);
   }
   IplImage * image_ipl = libopencv_(Main_torchimg2opencv_8U)(image);
   CvScalar color_cv = CV_RGB(THTensor_(get1d)(color,0),
@@ -918,9 +918,9 @@ static int libopencv_(Main_cvDrawFlowlinesOnImage) (lua_State *L) {
  *  -- return dense field
  */
 static int libopencv_(Main_smoothVoronoi) (lua_State *L) {
-  THTensor * points = luaT_checkudata(L,1, torch_(Tensor_id));
-  THTensor * data   = luaT_checkudata(L,2, torch_(Tensor_id));
-  THTensor * output = luaT_checkudata(L,3, torch_(Tensor_id));
+  THTensor * points = luaT_checkudata(L,1, torch_Tensor);
+  THTensor * data   = luaT_checkudata(L,2, torch_Tensor);
+  THTensor * output = luaT_checkudata(L,3, torch_Tensor);
   real * output_pt[8];
   int i;
   output_pt[0] = THTensor_(data)(output);
@@ -1027,8 +1027,8 @@ static int libopencv_(Main_smoothVoronoi) (lua_State *L) {
 //============================================================
 static int libopencv_(Main_cvCanny) (lua_State *L) {
   // Get Tensor's Info
-  THTensor * source = luaT_checkudata(L, 1, torch_(Tensor_id));
-  THTensor * dest   = luaT_checkudata(L, 2, torch_(Tensor_id));
+  THTensor * source = luaT_checkudata(L, 1, torch_Tensor);
+  THTensor * dest   = luaT_checkudata(L, 2, torch_Tensor);
 
   /* first convert the tensors into proper opencv Canny format */
 
@@ -1165,8 +1165,8 @@ static int libopencv_(Main_cvCanny) (lua_State *L) {
 //============================================================
 static int libopencv_(Main_cvEqualizeHist) (lua_State *L) {
   // Get Tensor's Info
-  THTensor * source = luaT_checkudata(L, 1, torch_(Tensor_id));
-  THTensor * dest   = luaT_checkudata(L, 2, torch_(Tensor_id));
+  THTensor * source = luaT_checkudata(L, 1, torch_Tensor);
+  THTensor * dest   = luaT_checkudata(L, 2, torch_Tensor);
 
   // Generate IPL headers
   IplImage * source_ipl = libopencv_(Main_torchimg2opencv_8U)(source);
@@ -1190,9 +1190,9 @@ static int libopencv_(Main_cvEqualizeHist) (lua_State *L) {
 //============================================================
 static int libopencv_(Main_cvWarpAffine) (lua_State *L) {
   // Get Tensor's Info
-  THTensor * source = luaT_checkudata(L, 1, torch_(Tensor_id));
-  THTensor * dest   = luaT_checkudata(L, 2, torch_(Tensor_id));
-  THTensor * warp   = luaT_checkudata(L, 3, torch_(Tensor_id));
+  THTensor * source = luaT_checkudata(L, 1, torch_Tensor);
+  THTensor * dest   = luaT_checkudata(L, 2, torch_Tensor);
+  THTensor * warp   = luaT_checkudata(L, 3, torch_Tensor);
 
   THArgCheck(warp->size[0] == 2 , 1, "warp matrix: 2x3 Tensor expected");
   THArgCheck(warp->size[1] == 3 , 1, "warp matrix: 2x3 Tensor expected");
@@ -1231,9 +1231,9 @@ static int libopencv_(Main_cvWarpAffine) (lua_State *L) {
 //============================================================
 static int libopencv_(Main_cvGetAffineTransform) (lua_State *L) {
   // Get Tensor's Info
-  THTensor * src = luaT_checkudata(L, 1, torch_(Tensor_id));
-  THTensor * dst   = luaT_checkudata(L, 2, torch_(Tensor_id));
-  THTensor * warp   = luaT_checkudata(L, 3, torch_(Tensor_id));
+  THTensor * src = luaT_checkudata(L, 1, torch_Tensor);
+  THTensor * dst   = luaT_checkudata(L, 2, torch_Tensor);
+  THTensor * warp   = luaT_checkudata(L, 3, torch_Tensor);
 
   /* THArgCheck(src->size[0] == 3 , 1, "input: 2x3 Tensor expected"); */
   /* THArgCheck(src->size[1] == 2 , 1, "input: 2x3 Tensor expected"); */
@@ -1261,10 +1261,10 @@ static int libopencv_(Main_cvGetAffineTransform) (lua_State *L) {
  * compute fundamental matrix from matching points between 2 images
  */
 static int libopencv_(Main_cvFindFundamental) (lua_State *L) {
-  THTensor * points1_th      = luaT_checkudata(L,1, torch_(Tensor_id));
-  THTensor * points2_th      = luaT_checkudata(L,2, torch_(Tensor_id));
-  THTensor * fundamental_th  = luaT_checkudata(L,3, torch_(Tensor_id));
-  THTensor * status_th       = luaT_checkudata(L,4, torch_(Tensor_id));
+  THTensor * points1_th      = luaT_checkudata(L,1, torch_Tensor);
+  THTensor * points2_th      = luaT_checkudata(L,2, torch_Tensor);
+  THTensor * fundamental_th  = luaT_checkudata(L,3, torch_Tensor);
+  THTensor * status_th       = luaT_checkudata(L,4, torch_Tensor);
 
   THTensor_(resize2d)(fundamental_th,3,3);
 
@@ -1329,7 +1329,7 @@ static int libopencv_(Main_cvGetFrame)(lua_State *L) {
     goto free_and_return;
   }
 
-  THTensor * dest   = luaT_checkudata(L, 2, torch_(Tensor_id));
+  THTensor * dest   = luaT_checkudata(L, 2, torch_Tensor);
   frame[cidx] = cvQueryFrame ( vcapture[cidx] );
 
   if ( frame[cidx] == NULL ) {
@@ -1360,7 +1360,7 @@ static int libopencv_(Main_cvWriteFrame)(lua_State *L) {
     ret = 0;
     goto free_and_return;
   }
-  THTensor * dest   = luaT_checkudata(L, 2, torch_(Tensor_id));
+  THTensor * dest   = luaT_checkudata(L, 2, torch_Tensor);
   frame_ipl = libopencv_(Main_torchimg2opencv_8U)(dest);
   ret = cvWriteFrame ( vwriter[cidx], frame_ipl);
   if ( ret < 1 ) {
@@ -1381,11 +1381,11 @@ static int libopencv_(Main_cvWriteFrame)(lua_State *L) {
  */
 static int libopencv_(Main_cvFindStereoCorrespondenceBM) (lua_State *L) {
   // Get Tensor's Info
-  THTensor * left = luaT_checkudata(L, 1, torch_(Tensor_id));
+  THTensor * left = luaT_checkudata(L, 1, torch_Tensor);
   IplImage * left_ipl = libopencv_(Main_torchimg2opencv_8U)(left);
-  THTensor * right = luaT_checkudata(L, 2, torch_(Tensor_id));
+  THTensor * right = luaT_checkudata(L, 2, torch_Tensor);
   IplImage * right_ipl = libopencv_(Main_torchimg2opencv_8U)(right);
-  THTensor * dest = luaT_checkudata(L, 3, torch_(Tensor_id));
+  THTensor * dest = luaT_checkudata(L, 3, torch_Tensor);
   // Create ipl image for result
   CvSize depth_size = cvSize(left->size[2], left->size[1]);
   IplImage * depth_ipl = cvCreateImage(depth_size, IPL_DEPTH_32F,1);
@@ -1426,12 +1426,12 @@ static int libopencv_(Main_cvFindStereoCorrespondenceBM) (lua_State *L) {
  */
 static int libopencv_(Main_cvFindStereoCorrespondenceGC) (lua_State *L) {
   // Get Tensor's Info
-  THTensor * left = luaT_checkudata(L, 1, torch_(Tensor_id));
+  THTensor * left = luaT_checkudata(L, 1, torch_Tensor);
   IplImage * left_ipl = libopencv_(Main_torchimg2opencv_8U)(left);
-  THTensor * right = luaT_checkudata(L, 2, torch_(Tensor_id));
+  THTensor * right = luaT_checkudata(L, 2, torch_Tensor);
   IplImage * right_ipl = libopencv_(Main_torchimg2opencv_8U)(right);
-  THTensor * Ldisp = luaT_checkudata(L, 3, torch_(Tensor_id));
-  THTensor * Rdisp = luaT_checkudata(L, 4, torch_(Tensor_id));
+  THTensor * Ldisp = luaT_checkudata(L, 3, torch_Tensor);
+  THTensor * Rdisp = luaT_checkudata(L, 4, torch_Tensor);
 
   // Create maps for result
   CvSize size = cvSize(left->size[2], left->size[1]);
@@ -1472,7 +1472,7 @@ static int libopencv_(Main_cvFindStereoCorrespondenceGC) (lua_State *L) {
 }
 
 static int libopencv_(Display)(lua_State* L) {
-  THTensor * image    = luaT_checkudata(L, 1, torch_(Tensor_id));
+  THTensor * image    = luaT_checkudata(L, 1, torch_Tensor);
   IplImage * image_cv = libopencv_(Main_torchimg2opencv_8U)(image);
   const char* win     = lua_tostring(L, 2);
 
@@ -1511,8 +1511,9 @@ static const luaL_reg libopencv_(Main__) [] =
 };
 
 DLL_EXPORT int libopencv_(Main_init) (lua_State *L) {
-  luaT_pushmetaclass(L, torch_(Tensor_id));
+  luaT_pushmetatable(L, torch_Tensor);
   luaT_registeratname(L, libopencv_(Main__), "libopencv");
+  lua_pop(L,1); 
   return 1;
 }
 
