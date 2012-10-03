@@ -1,7 +1,7 @@
 #include <TH.h>
 #include <luaT.h>
-#include <cv.h>
-#include <highgui.h>
+#include <opencv/cv.h>
+#include <opencv/highgui.h>
 
 /* These are containers for the VideoFromFile and VideoFromCam code */
 #define MAXFOPEN 100

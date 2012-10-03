@@ -33,8 +33,8 @@
 #include <signal.h>
 #include <pthread.h>
 
-#include <cv.h>
-#include <highgui.h>
+#include <opencv/cv.h>
+#include <opencv/highgui.h>
 #include "opencv_backcomp.hpp"
 
 #define CV_NO_BACKWARD_COMPATIBILITY
