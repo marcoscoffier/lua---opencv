@@ -3,7 +3,7 @@ CMAKE_POLICY(VERSION 2.6)
 FIND_PACKAGE(Torch REQUIRED)
 FIND_PACKAGE(OpenCV REQUIRED)
 
-SET(src opencv.c opencv_backcomp.cpp)
+SET(src  opencv_backcomp.cpp opencv.c)
 SET(luasrc init.lua img1.jpg img2.jpg)
 
 ADD_TORCH_PACKAGE(opencv "${src}" "${luasrc}" "Image Processing")
