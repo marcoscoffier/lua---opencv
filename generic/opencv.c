@@ -172,15 +172,21 @@ static void libopencv_(Main_opencv8U2torch)(IplImage *source, THTensor *dest) {
   int j = 0;
   int k = source->nChannels-1;
   uchar * sourcep = source_data;
+  int row_i = 0; 
   for (j=0;j<source->nChannels;j++){
-    sourcep = source_data+k-j; // start at correct channel opencv is BGR
     THTensor *tslice = THTensor_(newSelect)(tensor,0,j);
-    // copy
-    TH_TENSOR_APPLY(real, tslice,
-		    *tslice_data = ((real)(*sourcep))/255.0;
-		    // step through channels of ipl
-		    sourcep = sourcep + source->nChannels;
-		    );
+    for (row_i=0; row_i<source->height; row_i++) {
+      // start at correct channel opencv is BGR
+      sourcep = source_data + row_i*source_step + k-j;
+      THTensor *rowslice = THTensor_(newSelect)(tslice,0,row_i);
+      // copy
+      TH_TENSOR_APPLY(real, rowslice,
+		      *rowslice_data = ((real)(*sourcep))/255.0;
+		      // step through channels of ipl
+		      sourcep = sourcep + source->nChannels;
+		      );
+      THTensor_(free)(rowslice);
+    }
     THTensor_(free)(tslice);
   }
 
@@ -206,15 +212,21 @@ static void libopencv_(Main_opencv32F2torch)(IplImage *source, THTensor *dest) {
   int j = 0;
   int k = source->nChannels-1;
   float * sourcep = source_data;
+  int row_i = 0;
   for (j=0;j<source->nChannels;j++){
-    sourcep = source_data+k-j; // start at correct channel opencv is BGR
     THTensor *tslice = THTensor_(newSelect)(tensor,0,j);
-    // copy
-    TH_TENSOR_APPLY(real, tslice,
-		    *tslice_data = (real)(*sourcep);
-		    // step through ipl
-		    sourcep = sourcep + source->nChannels;
-		    );
+    for (row_i=0; row_i<source->height; row_i++) {
+      // start at correct channel opencv is BGR
+      sourcep = source_data + row_i*source_step + k-j;
+      THTensor *rowslice = THTensor_(newSelect)(tslice,0,row_i);
+      // copy
+      TH_TENSOR_APPLY(real, rowslice,
+		      *rowslice_data = ((real)(*sourcep));
+		      // step through channels of ipl
+		      sourcep = sourcep + source->nChannels;
+		      );
+      THTensor_(free)(rowslice);
+    }
     THTensor_(free)(tslice);
   }
 
@@ -245,18 +257,24 @@ static IplImage * libopencv_(Main_torchimg2opencv_8U)(THTensor *source) {
   int j = 0;
   int k = channels-1;
   uchar * destp = dest_data;
+  int row_i = 0;
   for (j=0;j<dest->nChannels;j++){
-    destp = dest_data+k-j; // start at correct channel opencv is BGR
     THTensor *tslice = THTensor_(newSelect)(tensor,0,j);
-    // copy
-    TH_TENSOR_APPLY(real, tslice,
-		    *destp = (uchar)(*tslice_data * 255.0);
-		    // step through ipl
-		    destp = destp + dest->nChannels;
-		    );
+    for (row_i=0; row_i<dest->height; row_i++) {
+      // start at correct channel opencv is BGR
+      destp = dest_data + row_i*dest_step + k-j;
+      THTensor *rowslice = THTensor_(newSelect)(tslice,0,row_i);
+      // copy
+      TH_TENSOR_APPLY(real, rowslice,
+		      *destp = (uchar)(*rowslice_data * 255.0);
+		      // step through ipl
+		      destp = destp + dest->nChannels;
+		      );
+      THTensor_(free)(rowslice);
+    }
     THTensor_(free)(tslice);
   }
-
+  
   // free
   THTensor_(free)(tensor);
 
@@ -285,14 +303,20 @@ static IplImage * libopencv_(Main_torchimg2opencv_32F)(THTensor *source) {
   int j = 0;
   int k = channels-1;
   float * destp = dest_data;
+  int row_i = 0;
   for (j=0;j<dest->nChannels;j++){
-    destp = dest_data+k-j; // start at correct channel opencv is BGR
     THTensor *tslice = THTensor_(newSelect)(tensor,0,j);
-    // copy
-    TH_TENSOR_APPLY(real, tslice,
-		    *destp = (float)(*tslice_data);
-		    destp = destp + dest->nChannels; // step through ipl
-		    );
+    for (row_i=0; row_i<dest->height; row_i++) {
+      // start at correct channel opencv is BGR
+      destp = dest_data + row_i*dest_step + k-j;
+      THTensor *rowslice = THTensor_(newSelect)(tslice,0,row_i);
+      // copy
+      TH_TENSOR_APPLY(real, rowslice,
+		      *destp = (float)(*rowslice_data);
+		      destp = destp + dest->nChannels;
+		      );
+      THTensor_(free)(rowslice);
+    }
     THTensor_(free)(tslice);
   }
   THTensor_(free)(tensor);
