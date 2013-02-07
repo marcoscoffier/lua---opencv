@@ -70,7 +70,7 @@ function opencv.StereoCorrespondenceBM(...)
                    right img must be RBG or grey scale]])
    end
    local dest = torch.Tensor()
-   libopencv.double.StereoCorrespondenceBM(leftImg,rightImg,dest,
+   left.libopencv.StereoCorrespondenceBM(leftImg,rightImg,dest,
                                            minDisparity, numberOfDisparities,
                                            textureThreshold)
    return dest
@@ -115,7 +115,7 @@ function opencv.StereoCorrespondenceGC(...)
    end
    local Ldisp = torch.Tensor()
    local Rdisp = torch.Tensor()
-   libopencv.double.StereoCorrespondenceGC(leftImg,rightImg,Ldisp,Rdisp,
+   left.libopencv.StereoCorrespondenceGC(leftImg,rightImg,Ldisp,Rdisp,
                                            maxIters, numberOfDisparities)
    return Ldisp,Rdisp
 end
