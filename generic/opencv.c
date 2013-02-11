@@ -328,21 +328,27 @@ static IplImage * libopencv_(Main_torchmask2opencv)(THTensor *source) {
   // Pointers
   uchar * mask_data;
   CvSize mask_size = cvSize(source->size[1], source->size[0]);
-
+  int mask_step;
   // Create ipl image
   IplImage *mask = cvCreateImage(mask_size, IPL_DEPTH_8U, 1);
   // get pointer to raw data
-  cvGetRawData(mask, (uchar**)&mask_data, NULL, NULL);
+  cvGetRawData(mask, (uchar**)&mask_data, &mask_step, NULL);
 
   // copy
-  THTensor *tensor  = THTensor_(newContiguous)(source);  
+  THTensor *tensor  = THTensor_(newContiguous)(source);
   uchar    *maskp   = mask_data;
+  int row_i = 0;
   // copy
-  TH_TENSOR_APPLY(real, tensor,
-                  *maskp = *tensor_data == 0?0:1;
-                  // step through ipl
-                  maskp++;
-                  );
+  for (row_i=0; row_i<mask->height; row_i++) {
+    THTensor *tslice = THTensor_(newSelect)(tensor, 0, row_i);
+    maskp = mask_data + row_i*mask_step;
+    TH_TENSOR_APPLY(real, tslice,
+		    *maskp = *tslice_data == 0?0:1;
+		    // step through ipl
+		    maskp++;
+		    );
+    THTensor_(free)(tslice);
+  }
 
   // free
   THTensor_(free)(tensor);
