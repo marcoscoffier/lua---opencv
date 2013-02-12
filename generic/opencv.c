@@ -213,7 +213,6 @@ static void libopencv_(Main_opencv32F2torch)(IplImage *source, THTensor *dest) {
   int j = 0;
   int k = source->nChannels-1;
   float * sourcep = source_data;
-  printf("source step:%d\n", source_step);
   for (j=0;j<source->nChannels;j++){
     THTensor *tslice = THTensor_(newSelect)(tensor,0,j);
     for (i=0; i<source->height; i++) {
