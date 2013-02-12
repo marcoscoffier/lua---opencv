@@ -169,16 +169,16 @@ static void libopencv_(Main_opencv8U2torch)(IplImage *source, THTensor *dest) {
 
   // Torch stores channels first, opencv last so we select the channel
   // in torch tensor and step through the opencv iplimage.
+  int i = 0; 
   int j = 0;
   int k = source->nChannels-1;
   uchar * sourcep = source_data;
-  int row_i = 0; 
   for (j=0;j<source->nChannels;j++){
     THTensor *tslice = THTensor_(newSelect)(tensor,0,j);
-    for (row_i=0; row_i<source->height; row_i++) {
+    for (i=0; i<source->height; i++) {
       // start at correct channel opencv is BGR
-      sourcep = source_data + row_i*source_step + k-j;
-      THTensor *rowslice = THTensor_(newSelect)(tslice,0,row_i);
+      sourcep = source_data + i*source_step/sizeof(uchar) + k-j;
+      THTensor *rowslice = THTensor_(newSelect)(tslice,0,i);
       // copy
       TH_TENSOR_APPLY(real, rowslice,
 		      *rowslice_data = ((real)(*sourcep))/255.0;
@@ -209,16 +209,17 @@ static void libopencv_(Main_opencv32F2torch)(IplImage *source, THTensor *dest) {
 
   // Torch stores channels first, opencv last so we select the channel
   // in torch tensor and step through the opencv iplimage.
+  int i = 0;
   int j = 0;
   int k = source->nChannels-1;
   float * sourcep = source_data;
-  int row_i = 0;
+  printf("source step:%d\n", source_step);
   for (j=0;j<source->nChannels;j++){
     THTensor *tslice = THTensor_(newSelect)(tensor,0,j);
-    for (row_i=0; row_i<source->height; row_i++) {
+    for (i=0; i<source->height; i++) {
       // start at correct channel opencv is BGR
-      sourcep = source_data + row_i*source_step + k-j;
-      THTensor *rowslice = THTensor_(newSelect)(tslice,0,row_i);
+      sourcep = source_data + i*source_step/sizeof(float) + k-j;
+      THTensor *rowslice = THTensor_(newSelect)(tslice,0,i);
       // copy
       TH_TENSOR_APPLY(real, rowslice,
 		      *rowslice_data = ((real)(*sourcep));
@@ -254,16 +255,16 @@ static IplImage * libopencv_(Main_torchimg2opencv_8U)(THTensor *source) {
 
   // Torch stores channels first, opencv last so we select the channel
   // in torch tensor and step through the opencv iplimage.
+  int i = 0;
   int j = 0;
   int k = channels-1;
   uchar * destp = dest_data;
-  int row_i = 0;
   for (j=0;j<dest->nChannels;j++){
     THTensor *tslice = THTensor_(newSelect)(tensor,0,j);
-    for (row_i=0; row_i<dest->height; row_i++) {
+    for (i=0; i<dest->height; i++) {
       // start at correct channel opencv is BGR
-      destp = dest_data + row_i*dest_step + k-j;
-      THTensor *rowslice = THTensor_(newSelect)(tslice,0,row_i);
+      destp = dest_data + i*dest_step / sizeof(uchar) + k-j;
+      THTensor *rowslice = THTensor_(newSelect)(tslice,0,i);
       // copy
       TH_TENSOR_APPLY(real, rowslice,
 		      *destp = (uchar)(*rowslice_data * 255.0);
@@ -300,16 +301,16 @@ static IplImage * libopencv_(Main_torchimg2opencv_32F)(THTensor *source) {
   THTensor *tensor = THTensor_(newContiguous)(source);
   // Torch stores channels first, opencv last so we select the channel
   // in torch tensor and step through the opencv iplimage.
+  int i = 0;
   int j = 0;
   int k = channels-1;
   float * destp = dest_data;
-  int row_i = 0;
   for (j=0;j<dest->nChannels;j++){
     THTensor *tslice = THTensor_(newSelect)(tensor,0,j);
-    for (row_i=0; row_i<dest->height; row_i++) {
+    for (i=0; i<dest->height; i++) {
       // start at correct channel opencv is BGR
-      destp = dest_data + row_i*dest_step + k-j;
-      THTensor *rowslice = THTensor_(newSelect)(tslice,0,row_i);
+      destp = dest_data + i*dest_step/sizeof(float) + k-j;
+      THTensor *rowslice = THTensor_(newSelect)(tslice,0,i);
       // copy
       TH_TENSOR_APPLY(real, rowslice,
 		      *destp = (float)(*rowslice_data);
@@ -337,11 +338,11 @@ static IplImage * libopencv_(Main_torchmask2opencv)(THTensor *source) {
   // copy
   THTensor *tensor  = THTensor_(newContiguous)(source);
   uchar    *maskp   = mask_data;
-  int row_i = 0;
+  int i = 0;
   // copy
-  for (row_i=0; row_i<mask->height; row_i++) {
-    THTensor *tslice = THTensor_(newSelect)(tensor, 0, row_i);
-    maskp = mask_data + row_i*mask_step;
+  for (i=0; i<mask->height; i++) {
+    THTensor *tslice = THTensor_(newSelect)(tensor, 0, i);
+    maskp = mask_data + i*mask_step/sizeof(uchar);
     TH_TENSOR_APPLY(real, tslice,
 		    *maskp = *tslice_data == 0?0:1;
 		    // step through ipl
@@ -1078,7 +1079,7 @@ static int libopencv_(Main_cvCanny) (lua_State *L) {
   THTensor *tensor = THTensor_(newContiguous)(source);
   int i = 0;
   for (i=0;i<source->size[1];i++){
-    uchar * sourcep = source_data + source_step*i;
+    uchar * sourcep = source_data + i*source_step/sizeof(uchar) ;
     THTensor *tslice = THTensor_(newSelect)(tensor,1,i);
     // copy
     TH_TENSOR_APPLY(real, tslice,
