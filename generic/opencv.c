@@ -1250,9 +1250,9 @@ static int libopencv_(Main_cvWarpAffine) (lua_State *L) {
   // Return results
   libopencv_(Main_opencv8U2torch)(dest_ipl, dest);
 
-  // Deallocate headers
-  cvReleaseImageHeader(&source_ipl);
-  cvReleaseImageHeader(&dest_ipl);
+  // Deallocate memory
+  cvReleaseImage(&source_ipl);
+  cvReleaseImage(&dest_ipl);
   cvReleaseMat( &warp_mat );
 
   return 0;
